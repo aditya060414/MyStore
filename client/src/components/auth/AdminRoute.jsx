@@ -54,7 +54,7 @@ export const AdminRoute = ({ children }) => {
           <div className="bg-slate-900/80 rounded-2xl p-4 border border-slate-800 text-left space-y-2 text-xs">
             <div className="flex items-center justify-between text-slate-400">
               <span>Signed In As:</span>
-              <span className="font-bold text-white">{user.email}</span>
+              <span className="font-bold text-white">{user.phone || user.email || 'N/A'}</span>
             </div>
             <div className="flex items-center justify-between text-slate-400">
               <span>Account Name:</span>
