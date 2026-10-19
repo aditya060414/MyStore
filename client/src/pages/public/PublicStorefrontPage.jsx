@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { api } from '../../services/api';
 import {
   Store,
@@ -18,7 +19,8 @@ import {
 } from 'lucide-react';
 
 export const PublicStorefrontPage = () => {
-  const { storeSlug } = useParams();
+  const params = useParams();
+  const storeHandle = params.storeHandle || params.storeSlug;
   const [products, setProducts] = useState([]);
   const [storeInfo, setStoreInfo] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -41,99 +43,29 @@ export const PublicStorefrontPage = () => {
     const fetchStoreCatalog = async () => {
       setLoading(true);
       try {
-        // Fallback demo products matching screenshot if public route
-        const mockCatalog = [
-          {
-            _id: 'prod-maggi',
-            name: 'Maggi Noodles',
-            brand: 'Nestle',
-            category: 'Snacks',
-            sellingPrice: 12,
-            stock: 50,
-            image: 'https://images.unsplash.com/photo-1612927601601-6638404737ce?auto=format&fit=crop&w=300&q=80',
-          },
-          {
-            _id: 'prod-coke',
-            name: 'Coca Cola',
-            brand: 'Coca Cola',
-            category: 'Beverages',
-            sellingPrice: 40,
-            stock: 30,
-            image: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=300&q=80',
-          },
-          {
-            _id: 'prod-lays',
-            name: 'Lays Classic',
-            brand: 'Lays',
-            category: 'Snacks',
-            sellingPrice: 20,
-            stock: 25,
-            image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?auto=format&fit=crop&w=300&q=80',
-          },
-          {
-            _id: 'prod-milk',
-            name: 'Amul Milk',
-            brand: 'Amul',
-            category: 'Dairy',
-            sellingPrice: 28,
-            stock: 12,
-            image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=300&q=80',
-          },
-          {
-            _id: 'prod-parleg',
-            name: 'Parle-G',
-            brand: 'Parle',
-            category: 'Biscuits',
-            sellingPrice: 10,
-            stock: 100,
-            image: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?auto=format&fit=crop&w=300&q=80',
-          },
-          {
-            _id: 'prod-bread',
-            name: 'Britannia Bread',
-            brand: 'Britannia',
-            category: 'Bakery',
-            sellingPrice: 35,
-            stock: 5,
-            image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80',
-          },
-          {
-            _id: 'prod-sprite',
-            name: 'Sprite',
-            brand: 'Coca Cola',
-            category: 'Beverages',
-            sellingPrice: 40,
-            stock: 45,
-            image: 'https://images.unsplash.com/photo-1625772299848-391b6a87d7b3?auto=format&fit=crop&w=300&q=80',
-          },
-          {
-            _id: 'prod-dairymilk',
-            name: 'Dairy Milk',
-            brand: 'Cadbury',
-            category: 'Chocolates',
-            sellingPrice: 60,
-            stock: 8,
-            image: 'https://images.unsplash.com/photo-1548907040-4baa42d10919?auto=format&fit=crop&w=300&q=80',
-          },
-        ];
-
-        setProducts(mockCatalog);
-        const cats = Array.from(new Set(mockCatalog.map((p) => p.category)));
-        setCategories(['All', ...cats]);
-        setStoreInfo({
-          name: 'Apex Supermarket',
-          address: '123 Market Street, Indiranagar, Bangalore',
-          phone: '+91 9876543210',
-          openHours: 'Open Today: 8:00 AM – 10:00 PM',
-        });
+        const res = await api.getPublicStoreCatalog(storeHandle);
+        if (res.success && res.data) {
+          const prods = res.data.products || [];
+          setProducts(prods);
+          const cats = res.data.categories || Array.from(new Set(prods.map((p) => p.category).filter(Boolean)));
+          setCategories(['All', ...cats]);
+          setStoreInfo({
+            name: res.data.store?.name || 'Online Store',
+            address: res.data.store?.address || 'Online Ordering Store',
+            phone: res.data.store?.phone || '',
+            openHours: 'Open Today: 8:00 AM – 10:00 PM',
+          });
+        }
       } catch (err) {
         console.error('Failed to load store:', err);
       } finally {
         setLoading(false);
       }
     };
-    fetchStoreCatalog();
-  }, [storeSlug]);
+    if (storeHandle) {
+      fetchStoreCatalog();
+    }
+  }, [storeHandle]);
 
   const addToCart = (product) => {
     setCart((prev) => {
@@ -154,6 +86,7 @@ export const PublicStorefrontPage = () => {
         },
       ];
     });
+    toast.success(`Added ${product.name} to cart!`, { autoClose: 2000 });
     setCartOpen(true);
   };
 
@@ -190,14 +123,15 @@ export const PublicStorefrontPage = () => {
         paymentMethod,
       };
 
-      const res = await api.createPublicOrder(storeSlug || 'apex-indiranagar', payload);
+      const res = await api.createPublicOrder(storeHandle, payload);
       if (res.success) {
         setOrderConfirmed(res.data);
         setCart([]);
         setCheckoutOpen(false);
+        toast.success('Order placed successfully! Check your order confirmation details.');
       }
     } catch (err) {
-      alert(`Order placement error: ${err.message}`);
+      toast.error(`Order placement error: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -223,11 +157,11 @@ export const PublicStorefrontPage = () => {
             </div>
             <div>
               <h1 className="font-extrabold text-base text-slate-900 tracking-tight leading-tight">
-                {storeInfo?.name || 'Apex Supermarket'}
+                {storeInfo?.name || 'Online Store'}
               </h1>
               <p className="text-[11px] text-slate-500 flex items-center gap-1">
                 <MapPin className="w-3 h-3 text-rose-500" />
-                <span>Indiranagar, Bangalore</span>
+                <span>{storeInfo?.address || 'Direct Order Store'}</span>
               </p>
             </div>
           </div>
@@ -337,6 +271,18 @@ export const PublicStorefrontPage = () => {
               </div>
             </div>
           ))}
+
+          {filteredProducts.length === 0 && !loading && (
+            <div className="col-span-full py-16 text-center bg-white rounded-2xl border border-dashed border-slate-200">
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3">
+                <ShoppingBag className="w-6 h-6" />
+              </div>
+              <h3 className="font-bold text-slate-800 text-sm">No products listed yet</h3>
+              <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                Items added by the store owner will appear here ready for online order.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
