@@ -2,9 +2,9 @@ import mongoose from 'mongoose';
 
 const customerSchema = new mongoose.Schema(
   {
-    tenantId: {
+    businessId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Tenant',
+      ref: 'Business',
       required: true,
       index: true,
     },
@@ -48,6 +48,6 @@ const customerSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-customerSchema.index({ tenantId: 1, phone: 1 });
+customerSchema.index({ businessId: 1, phone: 1 });
 
 export default mongoose.model('Customer', customerSchema);
