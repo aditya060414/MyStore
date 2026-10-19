@@ -26,7 +26,7 @@ export const LandingPage = () => {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
               <Store className="w-6 h-6" />
             </div>
-            <span className="font-extrabold text-xl text-slate-900 tracking-tight">MyStore</span>
+            <span className="font-extrabold text-xl text-slate-900 tracking-tight">BisonMooves Store</span>
           </Link>
 
           <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
@@ -58,7 +58,7 @@ export const LandingPage = () => {
       <section className="pt-20 pb-16 px-6 max-w-7xl mx-auto text-center space-y-6">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold shadow-sm">
           <Zap className="w-3.5 h-3.5 text-blue-600" />
-          <span>Multi-Tenant Retail Management Cloud Platform</span>
+          <span>Multi-Business Retail Management Cloud Platform</span>
         </div>
 
         <h1 className="text-4xl sm:text-6xl font-extrabold text-slate-900 tracking-tight max-w-4xl mx-auto leading-[1.15]">
@@ -69,7 +69,7 @@ export const LandingPage = () => {
         </h1>
 
         <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto font-medium">
-          Built for modern independent retail shops, supermarkets, and convenience stores. Complete tenant isolation,
+          Built for modern independent retail shops, supermarkets, and convenience stores. Complete business isolation,
           instant POS billing, online ordering storefront, and gross profit accounting.
         </p>
 
@@ -114,7 +114,7 @@ export const LandingPage = () => {
         <div className="text-center space-y-3 mb-16">
           <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Everything Your Retail Business Needs</h2>
           <p className="text-sm text-slate-500 max-w-xl mx-auto">
-            From checkout counters to public customer ordering, MyStore gives you the tools to operate like a modern retail giant.
+            From checkout counters to public customer ordering, BisonMooves Store gives you the tools to operate like a modern retail giant.
           </p>
         </div>
 
@@ -244,12 +244,11 @@ export const LandingPage = () => {
       <footer className="mt-20 border-t border-slate-200 py-12 px-6 max-w-7xl mx-auto text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <Store className="w-4 h-4 text-blue-600" />
-          <span className="font-bold text-slate-900">MyStore SaaS</span>
+          <span className="font-bold text-slate-900">BisonMooves Store SaaS</span>
           <span>© 2026. All rights reserved.</span>
         </div>
         <div className="flex items-center gap-6">
           <Link to="/signin" className="hover:text-blue-600">Merchant Login</Link>
-          <Link to="/platform" className="hover:text-blue-600">Platform Admin</Link>
         </div>
       </footer>
     </div>
