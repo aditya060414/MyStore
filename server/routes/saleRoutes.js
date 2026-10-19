@@ -1,11 +1,11 @@
 import express from 'express';
 import { createSale, getSales, getSaleById } from '../controllers/saleController.js';
 import { protect } from '../middleware/authMiddleware.js';
-import { resolveTenant } from '../middleware/tenantMiddleware.js';
+import { resolveBusiness } from '../middleware/businessMiddleware.js';
 
 const router = express.Router();
 
-router.use(protect, resolveTenant);
+router.use(protect, resolveBusiness);
 
 router.post('/', createSale);
 router.get('/', getSales);
