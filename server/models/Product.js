@@ -2,9 +2,9 @@ import mongoose from 'mongoose';
 
 const productSchema = new mongoose.Schema(
   {
-    tenantId: {
+    businessId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Tenant',
+      ref: 'Business',
       required: true,
       index: true,
     },
@@ -75,7 +75,7 @@ const productSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-productSchema.index({ tenantId: 1, barcode: 1 });
-productSchema.index({ tenantId: 1, name: 'text', brand: 'text', category: 'text' });
+productSchema.index({ businessId: 1, barcode: 1 });
+productSchema.index({ businessId: 1, name: 'text', brand: 'text', category: 'text' });
 
 export default mongoose.model('Product', productSchema);
