@@ -1,7 +1,7 @@
 export const requireRoles = (allowedRoles = []) => {
   return (req, res, next) => {
     // Platform admin has all privileges
-    if (req.user && req.user.role === 'platform_admin') {
+    if (req.user && ['super_admin', 'admin'].includes(req.user.role)) {
       return next();
     }
 
