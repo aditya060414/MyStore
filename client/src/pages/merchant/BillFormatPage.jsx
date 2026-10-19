@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -21,59 +22,19 @@ import {
 } from 'lucide-react';
 
 export const BillFormatPage = () => {
-  const { activeTenant } = useAuth();
+  const { activeBusiness, activeTenant } = useAuth();
+  const currentBusiness = activeBusiness || activeTenant;
   const [allProducts, setAllProducts] = useState([]);
   const [productSearch, setProductSearch] = useState('');
   const [searchResults, setSearchResults] = useState([]);
 
   // Customer info
-  const [customerName, setCustomerName] = useState('Rahul Mehta');
-  const [customerPhone, setCustomerPhone] = useState('9876543210');
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [customerType, setCustomerType] = useState('Walk-in Customer');
 
-  // Items in bill - starter sample items matching screenshot
-  const [items, setItems] = useState([
-    {
-      productId: 'p1',
-      name: 'Maggi Noodles',
-      brand: 'Nestle',
-      price: 12,
-      costPrice: 9,
-      quantity: 2,
-      total: 24,
-      image: 'https://images.unsplash.com/photo-1612927601601-6638404737ce?auto=format&fit=crop&w=100&q=80',
-    },
-    {
-      productId: 'p2',
-      name: 'Coca Cola',
-      brand: 'Coca Cola',
-      price: 40,
-      costPrice: 30,
-      quantity: 1,
-      total: 40,
-      image: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=100&q=80',
-    },
-    {
-      productId: 'p3',
-      name: 'Lays Classic',
-      brand: 'Lays',
-      price: 20,
-      costPrice: 15,
-      quantity: 1,
-      total: 20,
-      image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?auto=format&fit=crop&w=100&q=80',
-    },
-    {
-      productId: 'p4',
-      name: 'Amul Milk',
-      brand: 'Amul',
-      price: 28,
-      costPrice: 24,
-      quantity: 1,
-      total: 28,
-      image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=100&q=80',
-    },
-  ]);
+  // Items in bill - starts fresh and empty
+  const [items, setItems] = useState([]);
 
   // Payment & discount
   const [paymentMode, setPaymentMode] = useState('Cash');
@@ -81,10 +42,7 @@ export const BillFormatPage = () => {
   const [discountValue, setDiscountValue] = useState(0);
   const [notes, setNotes] = useState('');
   const [billFormat, setBillFormat] = useState('A4 - Standard');
-  const [billNumber, setBillNumber] = useState('#1001');
-
-  // Success notification
-  const [successToast, setSuccessToast] = useState(false);
+  const [billNumber, setBillNumber] = useState('New Bill');
   const [saving, setSaving] = useState(false);
 
   // Load products for live search
@@ -94,20 +52,13 @@ export const BillFormatPage = () => {
         const res = await api.getProducts({ limit: 100 });
         if (res.success && res.data.products) {
           setAllProducts(res.data.products);
-          // If items currently have placeholder IDs, link them to real product IDs if matching name
-          setItems((prev) =>
-            prev.map((it) => {
-              const matched = res.data.products.find((p) => p.name.toLowerCase() === it.name.toLowerCase());
-              return matched ? { ...it, productId: matched._id, costPrice: matched.costPrice } : it;
-            })
-          );
         }
       } catch (err) {
         console.error('Failed to load products for POS:', err);
       }
     };
     loadProducts();
-  }, []);
+  }, [currentBusiness?._id]);
 
   // Filter products as user types
   useEffect(() => {
@@ -196,7 +147,7 @@ export const BillFormatPage = () => {
 
   const handleSaveBill = async () => {
     if (items.length === 0) {
-      alert('Please add at least one item to save the bill.');
+      toast.warning('Please add at least one item to save the bill.');
       return;
     }
     setSaving(true);
@@ -215,12 +166,12 @@ export const BillFormatPage = () => {
 
       const res = await api.createSale(payload);
       if (res.success) {
+        const savedBillNo = res.data?.billNumber || 'Bill';
         if (res.data?.billNumber) setBillNumber(res.data.billNumber);
-        setSuccessToast(true);
-        setTimeout(() => setSuccessToast(false), 3000);
+        toast.success(`Bill ${savedBillNo} saved and inventory updated!`);
       }
     } catch (err) {
-      alert(`Error saving bill: ${err.message}`);
+      toast.error(`Error saving bill: ${err.message}`);
     } finally {
       setSaving(false);
     }
@@ -232,13 +183,6 @@ export const BillFormatPage = () => {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Toast */}
-      {successToast && (
-        <div className="fixed top-6 right-6 z-50 flex items-center gap-2 bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-xl animate-in slide-in-from-top duration-200">
-          <CheckCircle2 className="w-5 h-5" />
-          <span className="font-semibold text-sm">Bill {billNumber} saved and inventory updated!</span>
-        </div>
-      )}
 
       {/* Header */}
       <div>
@@ -578,13 +522,13 @@ export const BillFormatPage = () => {
                   <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center">
                     <Store className="w-4 h-4" />
                   </div>
-                  <h3 className="font-extrabold text-slate-900 text-base">{activeTenant?.name || 'MyStore'}</h3>
+                  <h3 className="font-extrabold text-slate-900 text-base">{currentBusiness?.name || 'BisonMooves Store'}</h3>
                 </div>
                 <div className="text-[11px] text-slate-500 leading-tight">
                   <p>123 Market Street, Bangalore</p>
                   <p>Karnataka - 560001</p>
-                  <p>Phone: {activeTenant?.contactPhone || '9876543210'}</p>
-                  <p>Email: {activeTenant?.contactEmail || 'mystore@gmail.com'}</p>
+                  <p>Phone: {currentBusiness?.contactPhone || '9876543210'}</p>
+                  <p>Email: {currentBusiness?.contactEmail || 'bisonmooves@gmail.com'}</p>
                 </div>
               </div>
 
@@ -665,7 +609,7 @@ export const BillFormatPage = () => {
                 </span>
               </div>
 
-              <p className="text-[10px] text-slate-400 font-medium pt-1">Visit again | MyStore</p>
+              <p className="text-[10px] text-slate-400 font-medium pt-1">Visit again | BisonMooves Store</p>
             </div>
           </div>
         </div>
