@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { toast } from 'react-toastify';
 import { api } from '../../services/api';
 import {
   ShoppingBag,
@@ -23,14 +24,17 @@ import {
   Mail,
   User,
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export const OrdersPage = () => {
+  const { activeBusiness, activeTenant } = useAuth();
+  const currentBusinessId = activeBusiness?._id || activeTenant?._id;
   const [orders, setOrders] = useState([]);
   const [stats, setStats] = useState({
-    totalOrders: 124,
-    deliveredCount: 102,
-    pendingCount: 18,
-    cancelledCount: 4,
+    totalOrders: 0,
+    deliveredCount: 0,
+    pendingCount: 0,
+    cancelledCount: 0,
   });
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
@@ -63,7 +67,7 @@ export const OrdersPage = () => {
 
   useEffect(() => {
     fetchOrders();
-  }, [search, statusFilter, paymentFilter]);
+  }, [search, statusFilter, paymentFilter, currentBusinessId]);
 
   const handleUpdateStatus = async (orderId, newStatus) => {
     try {
@@ -71,9 +75,10 @@ export const OrdersPage = () => {
       if (res.success) {
         setSelectedOrder(res.data);
         fetchOrders();
+        toast.success(`Order marked as ${newStatus}`);
       }
     } catch (err) {
-      alert(`Error updating status: ${err.message}`);
+      toast.error(`Error updating status: ${err.message}`);
     }
   };
 
@@ -126,7 +131,7 @@ export const OrdersPage = () => {
           <p className="text-sm text-slate-500 mt-0.5">Track and manage all customer orders from your store.</p>
         </div>
         <button
-          onClick={() => alert('New orders are submitted automatically through your public storefront!')}
+          onClick={() => toast.info('New orders are submitted automatically through your public storefront!')}
           className="flex items-center gap-2 bg-[#2563eb] hover:bg-blue-700 text-white font-semibold text-sm px-4 py-2.5 rounded-xl shadow-md shadow-blue-500/20 transition-all self-start sm:self-auto cursor-pointer"
         >
           <Plus className="w-4 h-4" />
@@ -461,8 +466,9 @@ export const OrdersPage = () => {
               </button>
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(`${window.location.origin}/store/${selectedOrder.storeId?.slug || 'apex-indiranagar'}/track/${selectedOrder.orderNumber}`);
-                  alert('Order tracking link copied to clipboard!');
+                  const storeHandle = selectedOrder.storeId?.handle || selectedOrder.storeId?.slug || 'my-store';
+                  navigator.clipboard.writeText(`${window.location.origin}/store/${storeHandle}/track/${selectedOrder.orderNumber}`);
+                  toast.success('Order tracking link copied to clipboard!');
                 }}
                 className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md shadow-blue-500/20 transition-colors"
               >
