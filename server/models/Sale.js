@@ -44,9 +44,9 @@ const saleItemSchema = new mongoose.Schema({
 
 const saleSchema = new mongoose.Schema(
   {
-    tenantId: {
+    businessId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Tenant',
+      ref: 'Business',
       required: true,
       index: true,
     },
@@ -153,7 +153,7 @@ const saleSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-saleSchema.index({ tenantId: 1, sequenceNumber: -1 });
-saleSchema.index({ tenantId: 1, createdAt: -1 });
+saleSchema.index({ businessId: 1, sequenceNumber: -1 });
+saleSchema.index({ businessId: 1, createdAt: -1 });
 
 export default mongoose.model('Sale', saleSchema);
