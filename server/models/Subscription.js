@@ -2,9 +2,9 @@ import mongoose from 'mongoose';
 
 const subscriptionSchema = new mongoose.Schema(
   {
-    tenantId: {
+    businessId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Tenant',
+      ref: 'Business',
       required: true,
       index: true,
     },
