@@ -2,9 +2,9 @@ import mongoose from 'mongoose';
 
 const inventoryMovementSchema = new mongoose.Schema(
   {
-    tenantId: {
+    businessId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Tenant',
+      ref: 'Business',
       required: true,
       index: true,
     },
@@ -51,6 +51,6 @@ const inventoryMovementSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-inventoryMovementSchema.index({ tenantId: 1, createdAt: -1 });
+inventoryMovementSchema.index({ businessId: 1, createdAt: -1 });
 
 export default mongoose.model('InventoryMovement', inventoryMovementSchema);
