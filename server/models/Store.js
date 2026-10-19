@@ -68,10 +68,9 @@ const storeSchema = new mongoose.Schema(
   }
 );
 
-storeSchema.pre('save', function (next) {
+storeSchema.pre('save', function () {
   if (!this.handle && this.slug) this.handle = this.slug;
   if (!this.slug && this.handle) this.slug = this.handle;
-  next();
 });
 
 storeSchema.virtual('storeHandle').get(function () {
