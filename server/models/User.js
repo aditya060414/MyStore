@@ -27,8 +27,15 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['platform_admin', 'merchant_user'],
-      default: 'merchant_user',
+      enum: [
+        'super_admin',
+        'admin',
+        'employee',
+        'merchant',
+        'merchant_staff',
+        'users',
+      ],
+      default: 'merchant',
     },
     isVerified: {
       type: Boolean,
