@@ -124,17 +124,44 @@ class ApiService {
   }
 
   // Auth
-  async login(email, password) {
+  async login(phoneOrEmail, password) {
     return this.request('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({
+        phone: phoneOrEmail,
+        identifier: phoneOrEmail,
+        email: phoneOrEmail,
+        password,
+      }),
     });
   }
 
-  async register(name, email, password, phone) {
+  async register(nameOrPayload, phoneOrEmail, password, optionalPhoneOrEmail) {
+    let body;
+    if (typeof nameOrPayload === 'object' && nameOrPayload !== null) {
+      body = nameOrPayload;
+    } else {
+      // Supports both (name, phone, password, email) and legacy (name, email, password, phone)
+      const isSecondArgEmail = typeof phoneOrEmail === 'string' && phoneOrEmail.includes('@');
+      if (isSecondArgEmail) {
+        body = {
+          name: nameOrPayload,
+          email: phoneOrEmail,
+          password: password,
+          phone: optionalPhoneOrEmail,
+        };
+      } else {
+        body = {
+          name: nameOrPayload,
+          phone: phoneOrEmail,
+          password: password,
+          email: optionalPhoneOrEmail || '',
+        };
+      }
+    }
     return this.request('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ name, email, password, phone }),
+      body: JSON.stringify(body),
     });
   }
 
