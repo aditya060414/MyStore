@@ -5,31 +5,59 @@ const planSchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
-      unique: true,
+      trim: true,
+    },
+    handle: {
+      type: String,
+      lowercase: true,
+      trim: true,
     },
     slug: {
       type: String,
       required: true,
       unique: true,
       lowercase: true,
+      trim: true,
     },
     description: {
       type: String,
       default: '',
+      trim: true,
     },
     priceMonthly: {
       type: Number,
       required: true,
       default: 0,
+      min: 0,
     },
     priceAnnual: {
       type: Number,
       required: true,
       default: 0,
+      min: 0,
+    },
+    currency: {
+      type: String,
+      default: 'INR',
+      uppercase: true,
+    },
+    badge: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    isDefault: {
+      type: Boolean,
+      default: false,
+    },
+    trialDays: {
+      type: Number,
+      default: 0,
     },
     features: [
       {
         type: String,
+        trim: true,
       },
     ],
     limits: {
@@ -41,6 +69,7 @@ const planSchema = new mongoose.Schema(
       qrStoreSharing: { type: Boolean, default: true },
       customBranding: { type: Boolean, default: false },
       prioritySupport: { type: Boolean, default: false },
+      customDomain: { type: Boolean, default: false },
     },
     isActive: {
       type: Boolean,
@@ -51,7 +80,22 @@ const planSchema = new mongoose.Schema(
       default: 0,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  }
 );
 
+planSchema.pre('save', function (next) {
+  if (!this.handle && this.slug) this.handle = this.slug;
+  if (!this.slug && this.handle) this.slug = this.handle;
+  next();
+});
+
+planSchema.virtual('planKey').get(function () {
+  return this.handle || this.slug;
+});
+
 export default mongoose.model('Plan', planSchema);
+
