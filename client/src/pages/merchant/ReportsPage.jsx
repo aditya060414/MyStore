@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import {
   BarChart3,
   TrendingUp,
@@ -10,6 +11,7 @@ import {
   ShoppingBag,
   Coins,
   ArrowUpRight,
+  Inbox,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -27,12 +29,15 @@ import {
 const COLORS = ['#2563eb', '#38bdf8', '#818cf8', '#c084fc', '#34d399', '#f472b6'];
 
 export const ReportsPage = () => {
+  const { activeBusiness, activeTenant } = useAuth();
+  const currentBusinessId = activeBusiness?._id || activeTenant?._id;
   const [data, setData] = useState(null);
   const [range, setRange] = useState('30d');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchReports = async () => {
+      setLoading(true);
       try {
         const res = await api.getFinancialReport(range);
         if (res.success) {
@@ -45,37 +50,21 @@ export const ReportsPage = () => {
       }
     };
     fetchReports();
-  }, [range]);
+  }, [range, currentBusinessId]);
 
   const report = data || {
-    grossRevenue: 64800,
-    totalOfflineRevenue: 42350,
-    totalOnlineRevenue: 22450,
-    totalCogs: 45200,
-    grossProfit: 19600,
-    totalCashReceived: 31200,
-    salesCount: 184,
-    ordersCount: 46,
+    grossRevenue: 0,
+    totalOfflineRevenue: 0,
+    totalOnlineRevenue: 0,
+    totalCogs: 0,
+    grossProfit: 0,
+    totalCashReceived: 0,
+    salesCount: 0,
+    ordersCount: 0,
   };
 
-  const categoryData = [
-    { name: 'Snacks', value: 18400 },
-    { name: 'Beverages', value: 14200 },
-    { name: 'Dairy', value: 11600 },
-    { name: 'Biscuits', value: 9800 },
-    { name: 'Bakery', value: 6500 },
-    { name: 'Household', value: 4300 },
-  ];
-
-  const weeklyTrend = [
-    { day: 'Mon', revenue: 8400, profit: 2600 },
-    { day: 'Tue', revenue: 9800, profit: 3100 },
-    { day: 'Wed', revenue: 7600, profit: 2400 },
-    { day: 'Thu', revenue: 11200, profit: 3500 },
-    { day: 'Fri', revenue: 14500, profit: 4600 },
-    { day: 'Sat', revenue: 18900, profit: 5800 },
-    { day: 'Sun', revenue: 16200, profit: 5100 },
-  ];
+  const categoryData = data?.categoryData || [];
+  const weeklyTrend = data?.weeklyTrend || [];
 
   const handleExportCSV = () => {
     const rows = [
@@ -98,6 +87,10 @@ export const ReportsPage = () => {
     link.click();
     document.body.removeChild(link);
   };
+
+  const profitMargin = report.grossRevenue > 0
+    ? Math.round((report.grossProfit / report.grossRevenue) * 100)
+    : 0;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -140,29 +133,29 @@ export const ReportsPage = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm">
           <p className="text-xs font-medium text-slate-500">Gross Sales Revenue</p>
-          <h3 className="text-2xl font-extrabold text-slate-900 mt-1">₹{report.grossRevenue.toLocaleString()}</h3>
-          <p className="text-[11px] text-emerald-600 font-semibold mt-1 flex items-center gap-1">
-            <ArrowUpRight className="w-3.5 h-3.5" /> +14.2% from last period
+          <h3 className="text-2xl font-extrabold text-slate-900 mt-1">₹{Number(report.grossRevenue || 0).toLocaleString()}</h3>
+          <p className="text-[11px] text-slate-400 mt-1">
+            {report.salesCount + report.ordersCount} total transactions
           </p>
         </div>
 
         <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm">
           <p className="text-xs font-medium text-slate-500">Cost of Goods Sold (COGS)</p>
-          <h3 className="text-2xl font-extrabold text-slate-900 mt-1">₹{report.totalCogs.toLocaleString()}</h3>
+          <h3 className="text-2xl font-extrabold text-slate-900 mt-1">₹{Number(report.totalCogs || 0).toLocaleString()}</h3>
           <p className="text-[11px] text-slate-400 mt-1">Actual supplier cost of sold inventory</p>
         </div>
 
         <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm">
           <p className="text-xs font-medium text-slate-500">Gross Profit</p>
-          <h3 className="text-2xl font-extrabold text-emerald-600 mt-1">₹{report.grossProfit.toLocaleString()}</h3>
+          <h3 className="text-2xl font-extrabold text-emerald-600 mt-1">₹{Number(report.grossProfit || 0).toLocaleString()}</h3>
           <p className="text-[11px] text-emerald-600 font-semibold mt-1">
-            Margin: {report.grossRevenue ? Math.round((report.grossProfit / report.grossRevenue) * 100) : 30}%
+            Margin: {profitMargin}%
           </p>
         </div>
 
         <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm">
           <p className="text-xs font-medium text-slate-500">Cash Received</p>
-          <h3 className="text-2xl font-extrabold text-blue-600 mt-1">₹{report.totalCashReceived.toLocaleString()}</h3>
+          <h3 className="text-2xl font-extrabold text-blue-600 mt-1">₹{Number(report.totalCashReceived || 0).toLocaleString()}</h3>
           <p className="text-[11px] text-slate-400 mt-1">Physical cash tendered at POS</p>
         </div>
       </div>
@@ -177,9 +170,15 @@ export const ReportsPage = () => {
               <BarChart data={weeklyTrend} barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#94a3b8', fontSize: 12 }}
+                  tickFormatter={(val) => `₹${val}`}
+                />
                 <Tooltip
                   cursor={{ fill: '#f8fafc' }}
+                  formatter={(val, name) => [`₹${val}`, name]}
                   contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
                 />
                 <Bar dataKey="revenue" name="Revenue" fill="#2563eb" radius={[4, 4, 0, 0]} />
@@ -193,37 +192,49 @@ export const ReportsPage = () => {
         <div className="lg:col-span-4 bg-white rounded-2xl p-6 border border-slate-200/90 shadow-sm flex flex-col justify-between">
           <div>
             <h2 className="text-base font-bold text-slate-900 mb-4">Category-wise Sales</h2>
-            <div className="h-48 w-full flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartsPie>
-                  <Pie
-                    data={categoryData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={75}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {categoryData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </RechartsPie>
-              </ResponsiveContainer>
-            </div>
-            <div className="space-y-2 mt-4 text-xs font-medium">
-              {categoryData.map((cat, idx) => (
-                <div key={cat.name} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }}></span>
-                    <span className="text-slate-600">{cat.name}</span>
-                  </div>
-                  <span className="font-bold text-slate-800">₹{cat.value.toLocaleString()}</span>
+            {categoryData.length > 0 ? (
+              <>
+                <div className="h-48 w-full flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsPie>
+                      <Pie
+                        data={categoryData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={75}
+                        paddingAngle={3}
+                        dataKey="value"
+                      >
+                        {categoryData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(val) => [`₹${val}`, 'Sales']} />
+                    </RechartsPie>
+                  </ResponsiveContainer>
                 </div>
-              ))}
-            </div>
+                <div className="space-y-2 mt-4 text-xs font-medium">
+                  {categoryData.map((cat, idx) => (
+                    <div key={cat.name} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }}></span>
+                        <span className="text-slate-600">{cat.name}</span>
+                      </div>
+                      <span className="font-bold text-slate-800">₹{Number(cat.value || 0).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="py-16 text-center">
+                <Inbox className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <p className="text-xs font-semibold text-slate-600">No category sales yet</p>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Categorized sales distribution will appear here once items are billed.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
