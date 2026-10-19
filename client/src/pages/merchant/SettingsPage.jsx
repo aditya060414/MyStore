@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -14,13 +16,18 @@ import {
   AlertCircle,
   Crown,
   Sparkles,
+  LogOut,
+  KeyRound,
+  Smartphone,
 } from 'lucide-react';
 
 export const SettingsPage = () => {
-  const { activeTenant, setActiveTenant } = useAuth();
+  const { activeBusiness, setActiveBusiness, activeTenant, setActiveTenant, user, logout, logoutAll } = useAuth();
+  const navigate = useNavigate();
+  const currentBusiness = activeBusiness || activeTenant;
   const [activeTab, setActiveTab] = useState('branding');
 
-  // Tenant Branding & Settings state
+  // Business Branding & Settings state
   const [formData, setFormData] = useState({
     businessName: '',
     contactPhone: '',
@@ -29,7 +36,7 @@ export const SettingsPage = () => {
     taxName: 'GST',
     invoicePrefix: 'INV-',
     billFormat: 'A4 - Standard',
-    receiptFooter: 'Thank you for shopping with us! Visit again | MyStore',
+    receiptFooter: 'Thank you for shopping with us! Visit again | BisonMooves Store',
   });
 
   // Team state
@@ -37,46 +44,61 @@ export const SettingsPage = () => {
   const [staffModalOpen, setStaffModalOpen] = useState(false);
   const [newStaff, setNewStaff] = useState({ name: '', email: '', phone: '', role: 'cashier' });
 
-  // Subscription state
+  // Subscription & real-time quota state
   const [plans, setPlans] = useState([]);
   const [subData, setSubData] = useState(null);
+  const [productCount, setProductCount] = useState(0);
+  const [storesCount, setStoresCount] = useState(1);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   useEffect(() => {
-    if (activeTenant) {
+    if (currentBusiness) {
       setFormData({
-        businessName: activeTenant.name || '',
-        contactPhone: activeTenant.contactPhone || '',
-        contactEmail: activeTenant.contactEmail || '',
-        taxRate: activeTenant.settings?.taxRate || 0,
-        taxName: activeTenant.settings?.taxName || 'GST',
-        invoicePrefix: activeTenant.settings?.invoicePrefix || 'INV-',
-        billFormat: activeTenant.settings?.billFormat || 'A4 - Standard',
-        receiptFooter: activeTenant.settings?.receiptFooter || 'Thank you for shopping with us! Visit again | MyStore',
+        businessName: currentBusiness.name || '',
+        contactPhone: currentBusiness.contactPhone || '',
+        contactEmail: currentBusiness.contactEmail || '',
+        taxRate: currentBusiness.settings?.taxRate || 0,
+        taxName: currentBusiness.settings?.taxName || 'GST',
+        invoicePrefix: currentBusiness.settings?.invoicePrefix || 'INV-',
+        billFormat: currentBusiness.settings?.billFormat || 'A4 - Standard',
+        receiptFooter: currentBusiness.settings?.receiptFooter || 'Thank you for shopping with us! Visit again | BisonMooves Store',
       });
     }
 
     const loadData = async () => {
       try {
         const staffRes = await api.getStaff();
-        if (staffRes.success) setStaffList(staffRes.data);
+        if (staffRes.success) setStaffList(staffRes.data || []);
 
         const plansRes = await api.getPlans();
-        if (plansRes.success) setPlans(plansRes.data);
+        if (plansRes.success) setPlans(plansRes.data || []);
 
         const subRes = await api.getCurrentSubscription();
-        if (subRes.success) setSubData(subRes.data);
+        if (subRes.success && subRes.data) {
+          setSubData(subRes.data);
+          if (subRes.data.usage) {
+            setProductCount(subRes.data.usage.productsCount ?? 0);
+            setStoresCount(subRes.data.usage.storesCount ?? 1);
+          }
+        }
+
+        // Live inventory products count
+        const prodRes = await api.getProducts({ limit: 1 });
+        if (prodRes.success && prodRes.data?.stats) {
+          setProductCount(prodRes.data.stats.totalItems ?? 0);
+        }
       } catch (err) {
         console.error('Failed to load settings data:', err);
       }
     };
     loadData();
-  }, [activeTenant]);
+  }, [currentBusiness]);
 
   const handleSaveSettings = async (e) => {
     e.preventDefault();
     try {
       const payload = {
+        name: formData.businessName,
         contactPhone: formData.contactPhone,
         contactEmail: formData.contactEmail,
         settings: {
@@ -89,12 +111,12 @@ export const SettingsPage = () => {
       };
       const res = await api.updateSettings(payload);
       if (res.success) {
-        setActiveTenant(res.data);
-        setSavedSuccess(true);
-        setTimeout(() => setSavedSuccess(false), 3000);
+        if (setActiveBusiness) setActiveBusiness(res.data);
+        if (setActiveTenant) setActiveTenant(res.data);
+        toast.success('Store settings saved successfully!');
       }
     } catch (err) {
-      alert(`Error saving settings: ${err.message}`);
+      toast.error(`Error saving settings: ${err.message}`);
     }
   };
 
@@ -106,10 +128,10 @@ export const SettingsPage = () => {
         setStaffModalOpen(false);
         const staffRes = await api.getStaff();
         if (staffRes.success) setStaffList(staffRes.data);
-        alert('Staff member added successfully!');
+        toast.success('Staff member invited successfully!');
       }
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message || 'Error adding staff');
     }
   };
 
@@ -118,32 +140,48 @@ export const SettingsPage = () => {
       try {
         const res = await api.upgradePlan(planId, 'monthly');
         if (res.success) {
-          alert('Subscription updated successfully!');
+          toast.success('Subscription plan upgraded successfully!');
           window.location.reload();
         }
       } catch (err) {
-        alert(err.message);
+        toast.error(err.message || 'Error updating subscription');
       }
     }
   };
 
-  const currentPlan = activeTenant?.planId || plans.find((p) => p.slug === 'pro') || {};
+  const handleLogoutThisDevice = async () => {
+    await logout();
+    navigate('/signin', { replace: true });
+  };
+
+  const handleLogoutAllDevices = async () => {
+    if (window.confirm('Are you sure you want to log out of all devices? All active tokens and sessions will be revoked from Redis.')) {
+      await logoutAll();
+      navigate('/signin', { replace: true });
+    }
+  };
+
+  const currentPlan =
+    subData?.plan ||
+    subData?.subscription?.planId ||
+    currentBusiness?.planId ||
+    plans.find((p) => p.slug === 'free') ||
+    plans[0] ||
+    {};
+
+  const isFreePlan =
+    currentPlan.priceMonthly === 0 ||
+    currentPlan.slug === 'free' ||
+    (currentPlan.name && currentPlan.name.toLowerCase().includes('free'));
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
-      {/* Toast */}
-      {savedSuccess && (
-        <div className="fixed top-6 right-6 z-50 flex items-center gap-2 bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-xl animate-in slide-in-from-top duration-200">
-          <CheckCircle2 className="w-5 h-5" />
-          <span className="font-semibold text-sm">Settings saved successfully!</span>
-        </div>
-      )}
 
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Store Settings</h1>
         <p className="text-sm text-slate-500 mt-0.5">
-          Manage your retail business profile, invoice format, staff access, and subscription plan.
+          Manage your retail business profile, invoice format, staff access, subscription plan, and security sessions.
         </p>
       </div>
 
@@ -154,6 +192,7 @@ export const SettingsPage = () => {
           { id: 'invoicing', label: 'Invoicing & Tax', icon: Receipt },
           { id: 'staff', label: 'Staff & Roles', icon: Users },
           { id: 'subscription', label: 'Subscription & Limits', icon: CreditCard },
+          { id: 'security', label: 'Security & Session', icon: Shield },
         ].map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -184,17 +223,18 @@ export const SettingsPage = () => {
                   value={formData.businessName}
                   className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-slate-600 font-medium"
                 />
-                <p className="text-[10px] text-slate-400 mt-1">Contact SaaS operator to rename tenant</p>
+                <p className="text-[10px] text-slate-400 mt-1">Contact SaaS operator to rename business</p>
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Store Slug</label>
+                <label className="block font-semibold text-slate-700 mb-1">Store Handle (Web Link)</label>
                 <input
                   type="text"
                   disabled
-                  value={activeTenant?.slug || 'apex-supermarket'}
-                  className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-slate-600 font-mono"
+                  value={currentBusiness?.handle || currentBusiness?.storeHandle || currentBusiness?.slug || 'my-store'}
+                  className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-slate-600 font-mono text-xs"
                 />
+                <p className="text-[10px] text-slate-400 mt-1">Unique store handle used in your public storefront URL</p>
               </div>
             </div>
 
@@ -423,61 +463,184 @@ export const SettingsPage = () => {
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Crown className="w-6 h-6 text-amber-300" />
-                <h2 className="text-xl font-extrabold">{currentPlan.name || 'Pro'} Plan</h2>
+                <h2 className="text-xl font-extrabold">{currentPlan.name || (isFreePlan ? 'Free Starter' : 'Pro')} Plan</h2>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-white/20 text-white backdrop-blur-sm">
                   Active Subscription
                 </span>
               </div>
               <p className="text-blue-100 text-xs max-w-md">
-                ₹{currentPlan.priceMonthly || 999}/month • Renews on 15 Nov 2026. Includes online storefront, inventory alerts, and QR store sharing.
+                {isFreePlan ? (
+                  <span>
+                    ₹0 / Free Forever • Essential billing, single-counter POS & inventory. No monthly renewal charge.
+                  </span>
+                ) : (
+                  <span>
+                    ₹{currentPlan.priceMonthly}/month • {subData?.subscription?.currentPeriodEnd ? `Renews on ${new Date(subData.subscription.currentPeriodEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Active Monthly Subscription'}. Includes storefront and advanced reports.
+                  </span>
+                )}
               </p>
             </div>
 
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => {
-                  const bus = plans.find((p) => p.slug === 'business');
-                  if (bus) handleUpgradePlan(bus._id);
-                }}
-                className="px-5 py-2.5 rounded-2xl bg-white text-blue-700 font-bold text-xs shadow-md hover:bg-blue-50 transition-colors"
-              >
-                Upgrade to Business (₹2,499)
-              </button>
+              {isFreePlan ? (
+                <button
+                  onClick={() => {
+                    const proPlan = plans.find((p) => p.slug === 'pro') || plans.find((p) => p.priceMonthly > 0);
+                    if (proPlan) handleUpgradePlan(proPlan._id);
+                  }}
+                  className="px-5 py-2.5 rounded-2xl bg-white text-blue-700 font-bold text-xs shadow-md hover:bg-blue-50 transition-colors cursor-pointer"
+                >
+                  Upgrade to Pro (₹999/mo)
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    const bus = plans.find((p) => p.slug === 'enterprise' || p.slug === 'business');
+                    if (bus) handleUpgradePlan(bus._id);
+                  }}
+                  className="px-5 py-2.5 rounded-2xl bg-white text-blue-700 font-bold text-xs shadow-md hover:bg-blue-50 transition-colors cursor-pointer"
+                >
+                  Upgrade to Enterprise (₹2,499)
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Usage Limit Bars */}
+          {/* Dynamic Usage Limit Bars */}
           <div className="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-sm space-y-4">
             <h3 className="text-sm font-bold text-slate-900">Plan Quota & Usage</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-xs">
               <div>
                 <div className="flex justify-between font-semibold mb-1">
                   <span className="text-slate-600">Products</span>
-                  <span className="text-slate-900 font-bold">10 / {currentPlan.limits?.maxProducts || 500}</span>
+                  <span className="text-slate-900 font-bold">
+                    {productCount} / {currentPlan.limits?.maxProducts || 50}
+                  </span>
                 </div>
                 <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                  <div className="bg-blue-600 h-full rounded-full" style={{ width: '2%' }}></div>
+                  <div
+                    className="bg-blue-600 h-full rounded-full transition-all duration-300"
+                    style={{
+                      width: `${Math.min(
+                        Math.round((productCount / (currentPlan.limits?.maxProducts || 50)) * 100),
+                        100
+                      )}%`,
+                    }}
+                  ></div>
                 </div>
               </div>
 
               <div>
                 <div className="flex justify-between font-semibold mb-1">
                   <span className="text-slate-600">Store Branches</span>
-                  <span className="text-slate-900 font-bold">1 / {currentPlan.limits?.maxStores || 1}</span>
+                  <span className="text-slate-900 font-bold">
+                    {storesCount} / {currentPlan.limits?.maxStores || 1}
+                  </span>
                 </div>
                 <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                  <div className="bg-blue-600 h-full rounded-full" style={{ width: '100%' }}></div>
+                  <div
+                    className="bg-blue-600 h-full rounded-full transition-all duration-300"
+                    style={{
+                      width: `${Math.min(
+                        Math.round((storesCount / (currentPlan.limits?.maxStores || 1)) * 100),
+                        100
+                      )}%`,
+                    }}
+                  ></div>
                 </div>
               </div>
 
               <div>
                 <div className="flex justify-between font-semibold mb-1">
                   <span className="text-slate-600">Staff Accounts</span>
-                  <span className="text-slate-900 font-bold">{staffList.length || 2} / {currentPlan.limits?.maxStaff || 5}</span>
+                  <span className="text-slate-900 font-bold">
+                    {staffList.length} / {currentPlan.limits?.maxStaff || 1}
+                  </span>
                 </div>
                 <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                  <div className="bg-blue-600 h-full rounded-full" style={{ width: '40%' }}></div>
+                  <div
+                    className="bg-blue-600 h-full rounded-full transition-all duration-300"
+                    style={{
+                      width: `${Math.min(
+                        Math.round((staffList.length / (currentPlan.limits?.maxStaff || 1)) * 100),
+                        100
+                      )}%`,
+                    }}
+                  ></div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Security & Session Tab */}
+      {activeTab === 'security' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-sm space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                <Shield className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Account Security & Active Sessions</h2>
+                <p className="text-xs text-slate-500">
+                  Signed in as <span className="font-semibold text-slate-700">{user?.email}</span> ({user?.role || 'merchant'})
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs text-slate-600">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-slate-700">Token & Session Storage:</span>
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">
+                  Guarded via Upstash Redis
+                </span>
+              </div>
+              <p>
+                When you sign out, your authorization token is completely purged from localStorage, sessionStorage, cookies, and deleted from the Redis server session cache to prevent any unauthorized reuse.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              <div className="border border-slate-200 rounded-2xl p-5 hover:border-slate-300 transition-colors flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center gap-2 font-bold text-sm text-slate-900 mb-1">
+                    <LogOut className="w-4 h-4 text-rose-500" />
+                    <span>Sign Out (This Browser)</span>
+                  </div>
+                  <p className="text-xs text-slate-500 mb-4">
+                    Immediately revoke this device's token and purge all browser storage and cookies.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLogoutThisDevice}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs border border-rose-200 transition-colors cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Sign Out of Current Session</span>
+                </button>
+              </div>
+
+              <div className="border border-slate-200 rounded-2xl p-5 hover:border-slate-300 transition-colors flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center gap-2 font-bold text-sm text-slate-900 mb-1">
+                    <KeyRound className="w-4 h-4 text-amber-500" />
+                    <span>Sign Out All Devices</span>
+                  </div>
+                  <p className="text-xs text-slate-500 mb-4">
+                    Invalidate all tokens and active sessions across all mobile apps, tablets, and browsers.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLogoutAllDevices}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors cursor-pointer"
+                >
+                  <Smartphone className="w-4 h-4" />
+                  <span>Revoke All Devices & Sessions</span>
+                </button>
               </div>
             </div>
           </div>
