@@ -38,7 +38,7 @@ const getUserBusinessesWithStores = async (user) => {
           handle: storeHandle,
           slug: storeHandle,
           phone: user.phone || '9876543210',
-          email: user.email,
+          email: user.email || 'mystore@gmail.com',
           isPrimary: true,
         });
       } else if (!existingStore.handle && existingStore.slug) {
@@ -123,7 +123,7 @@ const getUserBusinessesWithStores = async (user) => {
         currency: 'INR',
         currencySymbol: '₹',
         contactPhone: user.phone || '',
-        contactEmail: user.email,
+        contactEmail: user.email || '',
         settings: {
           taxRate: 0,
           taxName: 'GST',
@@ -139,7 +139,7 @@ const getUserBusinessesWithStores = async (user) => {
         handle: defaultHandle,
         slug: defaultHandle,
         phone: user.phone || '9876543210',
-        email: user.email,
+        email: user.email || 'mystore@gmail.com',
         isPrimary: true,
       });
 
@@ -207,37 +207,78 @@ const getUserBusinessesWithStores = async (user) => {
   return uniqueBusinesses;
 };
 
-// @desc    Register a new user
+// @desc    Register a new user / merchant
 // @route   POST /api/v1/auth/register
 export const register = async (req, res) => {
   try {
-    const { name, email, password, phone } = req.body;
+    const { name, phone, password, email } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ success: false, message: 'Please provide all required fields' });
+    if (!name || !phone || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Full Name, Phone Number, and Password are required',
+      });
     }
 
-    const userExists = await User.findOne({ email: email.toLowerCase() });
-    if (userExists) {
-      return res.status(400).json({ success: false, message: 'An account with this email already exists' });
+    const cleanPhone = phone.toString().trim().replace(/[\s\-\(\)]/g, '');
+    if (!cleanPhone || cleanPhone.length < 10) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid 10-digit phone number',
+      });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
-    // Default to 'merchant' when creating account from signup or dashboard
-    const user = await User.create({
-      name,
-      email: normalizedEmail,
-      password,
-      phone,
-      role: 'merchant',
+    // Check if an account with this phone already exists
+    const phoneExists = await User.findOne({
+      $or: [{ phone: cleanPhone }, { phone: phone.toString().trim() }],
     });
+    if (phoneExists) {
+      return res.status(400).json({
+        success: false,
+        message: 'An account with this phone number already exists',
+      });
+    }
 
+    // Email is optional for merchants
+    let normalizedEmail = undefined;
+    if (email && typeof email === 'string' && email.trim().length > 0) {
+      normalizedEmail = email.trim().toLowerCase();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(normalizedEmail)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide a valid email address or leave it blank',
+        });
+      }
+
+      const emailExists = await User.findOne({ email: normalizedEmail });
+      if (emailExists) {
+        return res.status(400).json({
+          success: false,
+          message: 'An account with this email already exists',
+        });
+      }
+    }
+
+    // Construct user document (omit email field if not provided to preserve sparse unique index)
+    const userData = {
+      name: name.trim(),
+      phone: cleanPhone,
+      password,
+      role: 'merchant',
+    };
+    if (normalizedEmail) {
+      userData.email = normalizedEmail;
+    }
+
+    const user = await User.create(userData);
     const token = generateToken(user._id);
 
     // Persist session to Upstash Redis
     await createSession(token, {
       userId: user._id.toString(),
-      email: user.email,
+      email: user.email || '',
+      phone: user.phone || '',
       name: user.name,
       role: user.role,
       isAdmin: false,
@@ -248,7 +289,7 @@ export const register = async (req, res) => {
       data: {
         _id: user._id,
         name: user.name,
-        email: user.email,
+        email: user.email || null,
         phone: user.phone,
         role: user.role,
         isAdmin: false,
@@ -262,24 +303,52 @@ export const register = async (req, res) => {
   }
 };
 
-// @desc    Login user & get token
+// @desc    Login user & get token (Primary: Phone number, optional/fallback: Email)
 // @route   POST /api/v1/auth/login
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const rawIdentifier = (
+      req.body.phone ||
+      req.body.identifier ||
+      req.body.email ||
+      ''
+    )
+      .toString()
+      .trim();
+    const { password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ success: false, message: 'Please enter email and password' });
+    if (!rawIdentifier || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter your phone number and password',
+      });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+    const cleanPhone = rawIdentifier.replace(/[\s\-\(\)]/g, '');
+    const cleanEmail = rawIdentifier.toLowerCase();
+
+    // Query by either phone or email so both merchants (phone) and existing users (email) can log in
+    const user = await User.findOne({
+      $or: [
+        { phone: cleanPhone },
+        { phone: rawIdentifier },
+        { email: cleanEmail },
+      ],
+    }).select('+password');
+
     if (!user) {
-      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid phone number or password',
+      });
     }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid phone number or password',
+      });
     }
 
     // Verify admin role strictly from database (super_admin, admin)
@@ -293,7 +362,8 @@ export const login = async (req, res) => {
     // Persist session to Upstash Redis
     await createSession(token, {
       userId: user._id.toString(),
-      email: user.email,
+      email: user.email || '',
+      phone: user.phone || '',
       name: user.name,
       role: user.role,
       isAdmin,
@@ -304,7 +374,7 @@ export const login = async (req, res) => {
       data: {
         _id: user._id,
         name: user.name,
-        email: user.email,
+        email: user.email || null,
         phone: user.phone,
         role: user.role,
         isAdmin,
