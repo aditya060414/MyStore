@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
+import { toast } from 'react-toastify';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { Store, ArrowRight } from 'lucide-react';
 
 export const RegisterPage = () => {
-  const { setUser } = useAuth();
+  const { user, setUser } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
@@ -16,6 +17,17 @@ export const RegisterPage = () => {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // If already logged in, redirect to dashboard or platform
+  React.useEffect(() => {
+    const token = localStorage.getItem('mystore_token');
+    if (user && token) {
+      const isAdmin =
+        user.isAdmin === true ||
+        ['super_admin', 'admin'].includes(user.role);
+      navigate(isAdmin ? '/platform' : '/app/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -25,10 +37,22 @@ export const RegisterPage = () => {
       if (res.success && res.data) {
         api.setToken(res.data.token);
         setUser(res.data);
-        navigate('/onboarding');
+        toast.success('Account created successfully! Welcome to MyStore.');
+
+        const isAdmin =
+          res.data.isAdmin === true ||
+          ['super_admin', 'admin'].includes(res.data.role);
+
+        if (isAdmin) {
+          navigate('/platform', { replace: true });
+        } else {
+          navigate('/onboarding', { replace: true });
+        }
       }
     } catch (err) {
-      setError(err.message || 'Registration failed');
+      const errorMsg = err.message || 'Registration failed';
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setSubmitting(false);
     }
@@ -41,7 +65,7 @@ export const RegisterPage = () => {
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/25">
             <Store className="w-7 h-7" />
           </div>
-          <span className="font-extrabold text-2xl text-slate-900 tracking-tight">MyStore</span>
+          <span className="font-extrabold text-2xl text-slate-900 tracking-tight">BisonMooves Store</span>
         </Link>
         <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Create your merchant account</h2>
         <p className="text-xs text-slate-500">Start your 14-day free trial. No credit card required.</p>
