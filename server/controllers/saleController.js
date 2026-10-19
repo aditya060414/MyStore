@@ -3,7 +3,7 @@ import Product from '../models/Product.js';
 import Customer from '../models/Customer.js';
 import InventoryMovement from '../models/InventoryMovement.js';
 import AuditLog from '../models/AuditLog.js';
-import Tenant from '../models/Tenant.js';
+import Business from '../models/Business.js';
 import Store from '../models/Store.js';
 
 // @desc    Create new POS bill / sale with atomic stock deduction & COGS snapshot
@@ -27,8 +27,9 @@ export const createSale = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please add at least one item to the bill' });
     }
 
-    const tenant = await Tenant.findById(req.tenantId);
-    const store = await Store.findOne({ tenantId: req.tenantId, isPrimary: true });
+    const activeBusinessId = req.businessId || req.tenantId;
+    const business = await Business.findById(activeBusinessId);
+    const store = await Store.findOne({ businessId: activeBusinessId, isPrimary: true });
 
     // Validate and process items against actual product records
     let subtotal = 0;
@@ -36,7 +37,7 @@ export const createSale = async (req, res) => {
     const processedItems = [];
 
     for (const item of items) {
-      const product = await Product.findOne({ _id: item.productId, tenantId: req.tenantId, isArchived: false });
+      const product = await Product.findOne({ _id: item.productId, businessId: activeBusinessId, isArchived: false });
       if (!product) {
         return res.status(400).json({
           success: false,
@@ -78,14 +79,14 @@ export const createSale = async (req, res) => {
 
     const discountedSubtotal = Math.max(0, subtotal - discountAmount);
 
-    // Calculate tax if configured in tenant settings
-    const taxRate = tenant?.settings?.taxRate || 0;
+    // Calculate tax if configured in business settings
+    const taxRate = business?.settings?.taxRate || 0;
     const taxAmount = taxRate > 0 ? Math.round((discountedSubtotal * taxRate) / 100) : 0;
     const totalAmount = discountedSubtotal + taxAmount;
     const grossProfit = totalAmount - taxAmount - totalCogs;
 
-    // Determine sequential bill number for this tenant
-    const lastSale = await Sale.findOne({ tenantId: req.tenantId }).sort({ sequenceNumber: -1 });
+    // Determine sequential bill number for this business
+    const lastSale = await Sale.findOne({ businessId: activeBusinessId }).sort({ sequenceNumber: -1 });
     const sequenceNumber = lastSale && lastSale.sequenceNumber ? lastSale.sequenceNumber + 1 : 1001;
     const billNumber = `#${sequenceNumber}`;
 
@@ -95,10 +96,10 @@ export const createSale = async (req, res) => {
     // Handle or create customer record
     let linkedCustomerId = customerId;
     if (!linkedCustomerId && customerPhone) {
-      let cust = await Customer.findOne({ tenantId: req.tenantId, phone: customerPhone });
+      let cust = await Customer.findOne({ businessId: activeBusinessId, phone: customerPhone });
       if (!cust) {
         cust = await Customer.create({
-          tenantId: req.tenantId,
+          businessId: activeBusinessId,
           name: customerName,
           phone: customerPhone,
           customerType,
@@ -115,7 +116,7 @@ export const createSale = async (req, res) => {
 
     // Create Sale record
     const sale = await Sale.create({
-      tenantId: req.tenantId,
+      businessId: activeBusinessId,
       storeId: store?._id,
       billNumber,
       sequenceNumber,
@@ -150,7 +151,7 @@ export const createSale = async (req, res) => {
       await product.save();
 
       await InventoryMovement.create({
-        tenantId: req.tenantId,
+        businessId: activeBusinessId,
         productId: product._id,
         productName: product.name,
         type: 'sale',
@@ -165,13 +166,28 @@ export const createSale = async (req, res) => {
 
     // Audit log
     await AuditLog.create({
-      tenantId: req.tenantId,
+      businessId: activeBusinessId,
       userId: req.user?._id,
       userName: req.user?.name || 'Admin',
       action: 'SALE_CREATED',
       entityType: 'Sale',
       entityId: sale._id.toString(),
-      details: { billNumber, totalAmount, paymentMethod, itemsCount: items.length },
+      details: {
+        billNumber,
+        totalAmount,
+        paymentMethod: sale.paymentMethod || 'Cash',
+        paymentType: 'Offline',
+        channel: 'Offline POS',
+        customerName: sale.customerName || 'Walk-in Customer',
+        customerPhone: sale.customerPhone || '—',
+        itemsCount: processedItems.reduce((sum, i) => sum + (i.quantity || 1), 0),
+        items: processedItems.map((i) => ({
+          name: i.name,
+          quantity: i.quantity,
+          price: i.price,
+          total: i.total || i.price * i.quantity,
+        })),
+      },
     });
 
     res.status(201).json({
@@ -189,7 +205,8 @@ export const createSale = async (req, res) => {
 export const getSales = async (req, res) => {
   try {
     const { search, paymentMethod, page = 1, limit = 20 } = req.query;
-    const query = { tenantId: req.tenantId };
+    const activeBusinessId = req.businessId || req.tenantId;
+    const query = { businessId: activeBusinessId };
 
     if (search) {
       query.$or = [
@@ -228,14 +245,15 @@ export const getSales = async (req, res) => {
 export const getSaleById = async (req, res) => {
   try {
     const { idOrBill } = req.params;
+    const activeBusinessId = req.businessId || req.tenantId;
     let sale = null;
 
     if (idOrBill.match(/^[0-9a-fA-F]{24}$/)) {
-      sale = await Sale.findOne({ _id: idOrBill, tenantId: req.tenantId });
+      sale = await Sale.findOne({ _id: idOrBill, businessId: activeBusinessId });
     }
 
     if (!sale) {
-      sale = await Sale.findOne({ billNumber: idOrBill, tenantId: req.tenantId });
+      sale = await Sale.findOne({ billNumber: idOrBill, businessId: activeBusinessId });
     }
 
     if (!sale) {
