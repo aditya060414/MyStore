@@ -2,9 +2,9 @@ import mongoose from 'mongoose';
 
 const auditLogSchema = new mongoose.Schema(
   {
-    tenantId: {
+    businessId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Tenant',
+      ref: 'Business',
       index: true,
     },
     userId: {
@@ -39,6 +39,6 @@ const auditLogSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-auditLogSchema.index({ tenantId: 1, createdAt: -1 });
+auditLogSchema.index({ businessId: 1, createdAt: -1 });
 
 export default mongoose.model('AuditLog', auditLogSchema);
