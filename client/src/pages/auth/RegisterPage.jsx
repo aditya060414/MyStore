@@ -3,16 +3,16 @@ import { toast } from 'react-toastify';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { Store, ArrowRight } from 'lucide-react';
+import { Store, ArrowRight, User, Phone, Mail, Lock } from 'lucide-react';
 
 export const RegisterPage = () => {
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
-    email: '',
-    password: '',
     phone: '',
+    password: '',
+    email: '',
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -31,13 +31,27 @@ export const RegisterPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    const cleanPhone = (formData.phone || '').trim().replace(/[\s\-\(\)]/g, '');
+    if (cleanPhone.length < 10) {
+      setError('Please provide a valid 10-digit phone number');
+      toast.error('Please provide a valid 10-digit phone number');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const res = await api.register(formData.name, formData.email, formData.password, formData.phone);
+      const res = await api.register({
+        name: formData.name.trim(),
+        phone: cleanPhone,
+        password: formData.password,
+        email: formData.email.trim() || undefined,
+      });
+
       if (res.success && res.data) {
         api.setToken(res.data.token);
         setUser(res.data);
-        toast.success('Account created successfully! Welcome to MyStore.');
+        toast.success('Account created successfully! Welcome to BisonMooves Store.');
 
         const isAdmin =
           res.data.isAdmin === true ||
@@ -68,7 +82,7 @@ export const RegisterPage = () => {
           <span className="font-extrabold text-2xl text-slate-900 tracking-tight">BisonMooves Store</span>
         </Link>
         <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Create your merchant account</h2>
-        <p className="text-xs text-slate-500">Start your 14-day free trial. No credit card required.</p>
+        <p className="text-xs text-slate-500">Sign up using your phone number to launch your store</p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
@@ -82,50 +96,78 @@ export const RegisterPage = () => {
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Full Name *</label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g. Rahul Sharma"
-                className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 font-medium focus:outline-none focus:border-blue-500"
-              />
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                  <User className="w-4 h-4" />
+                </div>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g. Rahul Sharma"
+                  className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl pl-10 pr-3 py-2.5 text-slate-800 font-medium focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                />
+              </div>
             </div>
 
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Business Email *</label>
-              <input
-                type="email"
-                required
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="rahul@store.com"
-                className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 font-medium focus:outline-none focus:border-blue-500"
-              />
+              <div className="flex items-center justify-between mb-1">
+                <label className="block font-semibold text-slate-700">Phone Number *</label>
+                <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded-md">Primary Login ID</span>
+              </div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                  <Phone className="w-4 h-4" />
+                </div>
+                <input
+                  type="tel"
+                  required
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="Enter 10-digit mobile number"
+                  autoComplete="tel"
+                  className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl pl-10 pr-3 py-2.5 text-slate-800 font-medium focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                />
+              </div>
             </div>
 
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Phone Number</label>
-              <input
-                type="text"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="9876543210"
-                className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 font-medium focus:outline-none focus:border-blue-500"
-              />
+              <label className="block font-semibold text-slate-700 mb-1">
+                Email Address <span className="font-normal text-slate-400 text-[11px]">(Optional)</span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="rahul@store.com (optional)"
+                  autoComplete="email"
+                  className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl pl-10 pr-3 py-2.5 text-slate-800 font-medium focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                />
+              </div>
             </div>
 
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Password *</label>
-              <input
-                type="password"
-                required
-                minLength={6}
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="At least 6 characters"
-                className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 font-medium focus:outline-none focus:border-blue-500"
-              />
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="At least 6 characters"
+                  autoComplete="new-password"
+                  className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl pl-10 pr-3 py-2.5 text-slate-800 font-medium focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                />
+              </div>
             </div>
 
             <button
@@ -141,7 +183,7 @@ export const RegisterPage = () => {
           <p className="text-center text-xs text-slate-500 pt-2">
             Already have an account?{' '}
             <Link to="/signin" className="font-bold text-blue-600 hover:underline">
-              Sign in
+              Sign in with Phone
             </Link>
           </p>
         </div>
