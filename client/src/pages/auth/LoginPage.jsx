@@ -1,23 +1,43 @@
 import React, { useState } from 'react';
+import { toast } from 'react-toastify';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Store,
   ArrowRight,
-  ShieldCheck,
-  User,
-  Lock,
-  Sparkles,
-  Zap,
+  AlertCircle,
 } from 'lucide-react';
 
 export const LoginPage = () => {
-  const { login } = useAuth();
+  const { user, login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(
+    searchParams.get('session_expired') ? 'Your session expired. Please sign in to continue.' : ''
+  );
   const [submitting, setSubmitting] = useState(false);
+
+  // If user is already logged in with token, redirect them to admin or store
+  React.useEffect(() => {
+    const token = localStorage.getItem('mystore_token');
+    if (user && token) {
+      const isAdmin =
+        user.isAdmin === true ||
+        ['super_admin', 'admin'].includes(user.role);
+
+      if (isAdmin) {
+        navigate('/platform', { replace: true });
+      } else {
+        const fromPath = location.state?.from?.pathname;
+        const isRestrictedTarget = fromPath && (fromPath.startsWith('/platform') || fromPath.startsWith('/admin'));
+        const destination = (!isRestrictedTarget && fromPath) ? fromPath : '/app/dashboard';
+        navigate(destination, { replace: true });
+      }
+    }
+  }, [user, navigate, location]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -25,21 +45,29 @@ export const LoginPage = () => {
     setSubmitting(true);
     try {
       const data = await login(email, password);
-      if (data.role === 'platform_admin') {
-        navigate('/platform');
+      toast.success(`Welcome back, ${data.name || 'User'}!`);
+      // Admin verification at login strictly from backend role
+      const isAdmin =
+        data.isAdmin === true ||
+        ['super_admin', 'admin'].includes(data.role);
+
+      if (isAdmin) {
+        // Route verified Admin to Platform Admin console
+        navigate('/platform', { replace: true });
       } else {
-        navigate('/app/dashboard');
+        // Route customer / merchant to store dashboard
+        const fromPath = location.state?.from?.pathname;
+        const isRestrictedTarget = fromPath && (fromPath.startsWith('/platform') || fromPath.startsWith('/admin'));
+        const destination = (!isRestrictedTarget && fromPath) ? fromPath : '/app/dashboard';
+        navigate(destination, { replace: true });
       }
     } catch (err) {
-      setError(err.message || 'Login failed. Please check your credentials.');
+      const errorMsg = err.message || 'Login failed. Please check your credentials.';
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const handleQuickLogin = (demoEmail, demoPassword) => {
-    setEmail(demoEmail);
-    setPassword(demoPassword);
   };
 
   return (
@@ -49,10 +77,10 @@ export const LoginPage = () => {
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/25">
             <Store className="w-7 h-7" />
           </div>
-          <span className="font-extrabold text-2xl text-slate-900 tracking-tight">MyStore</span>
+          <span className="font-extrabold text-2xl text-slate-900 tracking-tight">BisonMooves Store</span>
         </Link>
         <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Sign in to your dashboard</h2>
-        <p className="text-xs text-slate-500">Enter your credentials or choose a quick demo account below</p>
+        <p className="text-xs text-slate-500">Enter your credentials to access your store</p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
@@ -62,56 +90,6 @@ export const LoginPage = () => {
               {error}
             </div>
           )}
-
-          {/* Quick 1-Click Demo Accounts Selector */}
-          <div className="space-y-2">
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-              <span>One-Click Demo Profiles</span>
-            </p>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('rahul@apexretail.com', 'password123')}
-                className="p-2.5 rounded-xl border border-blue-200 bg-blue-50/60 hover:bg-blue-100/60 text-left transition-colors"
-              >
-                <p className="font-bold text-blue-900">Apex Supermarket</p>
-                <p className="text-[10px] text-blue-600">Owner Account</p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('sneha@apexretail.com', 'password123')}
-                className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-left transition-colors"
-              >
-                <p className="font-bold text-slate-800">Apex Cashier</p>
-                <p className="text-[10px] text-slate-500">POS Billing Only</p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('admin@mystore.com', 'admin123')}
-                className="p-2.5 rounded-xl border border-indigo-200 bg-indigo-50/60 hover:bg-indigo-100/60 text-left transition-colors"
-              >
-                <p className="font-bold text-indigo-900">Platform Admin</p>
-                <p className="text-[10px] text-indigo-600">SaaS Console</p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('pooja@greenmart.com', 'password123')}
-                className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/60 hover:bg-emerald-100/60 text-left transition-colors"
-              >
-                <p className="font-bold text-emerald-900">GreenMart</p>
-                <p className="text-[10px] text-emerald-600">Isolated Tenant 2</p>
-              </button>
-            </div>
-          </div>
-
-          <div className="relative flex items-center justify-center">
-            <div className="border-t border-slate-200 w-full"></div>
-            <span className="bg-white px-3 text-[11px] text-slate-400 uppercase font-semibold">Or enter manually</span>
-          </div>
 
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
