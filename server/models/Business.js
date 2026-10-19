@@ -104,10 +104,9 @@ const businessSchema = new mongoose.Schema(
   }
 );
 
-businessSchema.pre('save', function (next) {
+businessSchema.pre('save', function () {
   if (!this.handle && this.slug) this.handle = this.slug;
   if (!this.slug && this.handle) this.slug = this.handle;
-  next();
 });
 
 businessSchema.virtual('storeHandle').get(function () {
