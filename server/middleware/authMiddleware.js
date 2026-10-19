@@ -49,22 +49,27 @@ export const protect = async (req, res, next) => {
 
       // Always synchronize req.session with the latest database state
       if (req.session && !req.session._redisError) {
+        const userEmail = user.email || '';
+        const userPhone = user.phone || '';
         const needsSync =
           req.session.role !== user.role ||
           req.session.isAdmin !== isAdmin ||
-          req.session.email !== user.email ||
+          (req.session.email || '') !== userEmail ||
+          (req.session.phone || '') !== userPhone ||
           req.session.name !== user.name;
 
         req.session.role = user.role;
         req.session.isAdmin = isAdmin;
-        req.session.email = user.email;
+        req.session.email = userEmail;
+        req.session.phone = userPhone;
         req.session.name = user.name;
 
         if (needsSync) {
           updateSession(token, {
             role: user.role,
             isAdmin,
-            email: user.email,
+            email: userEmail,
+            phone: userPhone,
             name: user.name,
           }).catch((err) =>
             console.warn('[Redis] Failed to sync session with DB:', err.message)
