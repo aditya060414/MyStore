@@ -5,7 +5,8 @@ import { useNavigate, Link, useLocation, useSearchParams } from 'react-router-do
 import {
   Store,
   ArrowRight,
-  AlertCircle,
+  Phone,
+  Lock,
 } from 'lucide-react';
 
 export const LoginPage = () => {
@@ -13,7 +14,7 @@ export const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(
     searchParams.get('session_expired') ? 'Your session expired. Please sign in to continue.' : ''
@@ -44,8 +45,8 @@ export const LoginPage = () => {
     setError('');
     setSubmitting(true);
     try {
-      const data = await login(email, password);
-      toast.success(`Welcome back, ${data.name || 'User'}!`);
+      const data = await login(identifier, password);
+      toast.success(`Welcome back, ${data.name || 'Merchant'}!`);
       // Admin verification at login strictly from backend role
       const isAdmin =
         data.isAdmin === true ||
@@ -79,8 +80,8 @@ export const LoginPage = () => {
           </div>
           <span className="font-extrabold text-2xl text-slate-900 tracking-tight">BisonMooves Store</span>
         </Link>
-        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Sign in to your dashboard</h2>
-        <p className="text-xs text-slate-500">Enter your credentials to access your store</p>
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Sign in to your merchant dashboard</h2>
+        <p className="text-xs text-slate-500">Enter your phone number to access your store</p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
@@ -94,15 +95,21 @@ export const LoginPage = () => {
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Email address</label>
+              <label className="block font-semibold text-slate-700 mb-1">
+                Phone Number <span className="font-normal text-slate-400 text-[11px]">(or email)</span>
+              </label>
               <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                  <Phone className="w-4 h-4" />
+                </div>
                 <input
-                  type="email"
+                  type="text"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@business.com"
-                  className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 font-medium focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="Enter 10-digit phone number"
+                  autoComplete="username tel"
+                  className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl pl-10 pr-3 py-2.5 text-slate-800 font-medium focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
                 />
               </div>
             </div>
@@ -110,13 +117,17 @@ export const LoginPage = () => {
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Password</label>
               <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                  <Lock className="w-4 h-4" />
+                </div>
                 <input
                   type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 font-medium focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                  autoComplete="current-password"
+                  className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl pl-10 pr-3 py-2.5 text-slate-800 font-medium focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
                 />
               </div>
             </div>
