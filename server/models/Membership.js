@@ -8,9 +8,9 @@ const membershipSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    tenantId: {
+    businessId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Tenant',
+      ref: 'Business',
       required: true,
       index: true,
     },
@@ -34,6 +34,6 @@ const membershipSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-membershipSchema.index({ userId: 1, tenantId: 1 }, { unique: true });
+membershipSchema.index({ userId: 1, businessId: 1 }, { unique: true });
 
 export default mongoose.model('Membership', membershipSchema);
