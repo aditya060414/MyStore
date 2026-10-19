@@ -2,137 +2,222 @@ import Sale from '../models/Sale.js';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 
-// @desc    Get dashboard metrics and graphs matching screenshot
+// @desc    Get dashboard metrics and graphs matching store activity
 // @route   GET /api/v1/reports/dashboard
 export const getDashboardMetrics = async (req, res) => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const activeBusinessId = req.businessId || req.tenantId;
 
-    // Sales today
+    // Time boundaries for Today
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    // Time boundaries for Yesterday
+    const yesterdayStart = new Date(todayStart);
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+    const yesterdayEnd = new Date(todayStart);
+
+    // Sales and orders today
     const salesToday = await Sale.find({
-      tenantId: req.tenantId,
-      createdAt: { $gte: today },
+      businessId: activeBusinessId,
+      createdAt: { $gte: todayStart, $lte: todayEnd },
     });
 
     const ordersToday = await Order.find({
-      tenantId: req.tenantId,
-      createdAt: { $gte: today },
+      businessId: activeBusinessId,
+      createdAt: { $gte: todayStart, $lte: todayEnd },
+      orderStatus: { $ne: 'Cancelled' },
     });
 
-    // Offline sales metrics
-    let offlineSalesTotal = salesToday.reduce((sum, s) => sum + s.totalAmount, 0);
-    let offlineProfitTotal = salesToday.reduce((sum, s) => sum + (s.grossProfit || 0), 0);
-    let offlineItemsCount = salesToday.reduce(
-      (sum, s) => sum + s.items.reduce((iSum, item) => iSum + item.quantity, 0),
+    // Sales and orders yesterday for growth comparison
+    const salesYesterday = await Sale.find({
+      businessId: activeBusinessId,
+      createdAt: { $gte: yesterdayStart, $lt: yesterdayEnd },
+    });
+
+    const ordersYesterday = await Order.find({
+      businessId: activeBusinessId,
+      createdAt: { $gte: yesterdayStart, $lt: yesterdayEnd },
+      orderStatus: { $ne: 'Cancelled' },
+    });
+
+    // Offline sales metrics today
+    const offlineSalesToday = salesToday.reduce((sum, s) => sum + (s.totalAmount || 0), 0);
+    const offlineProfitToday = salesToday.reduce((sum, s) => sum + (s.grossProfit || 0), 0);
+    const offlineItemsCount = salesToday.reduce(
+      (sum, s) => sum + (s.items || []).reduce((iSum, item) => iSum + (item.quantity || 0), 0),
       0
     );
 
-    // Online sales metrics
-    let onlineSalesTotal = ordersToday.reduce((sum, o) => sum + o.totalAmount, 0);
-    let onlineItemsCount = ordersToday.reduce(
-      (sum, o) => sum + o.items.reduce((iSum, item) => iSum + item.quantity, 0),
+    // Online sales metrics today
+    const onlineSalesToday = ordersToday.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const onlineItemsCount = ordersToday.reduce(
+      (sum, o) => sum + (o.items || []).reduce((iSum, item) => iSum + (item.quantity || 0), 0),
       0
     );
 
-    // Combined or default realistic numbers if newly initialized
-    const totalSalesAmount = offlineSalesTotal + onlineSalesTotal || 12450;
-    const totalItemsSold = offlineItemsCount + onlineItemsCount || 43;
-    const totalProfit = offlineProfitTotal || 3820;
-    const onlineOrdersCount = ordersToday.length || 12;
+    const totalSalesAmount = offlineSalesToday + onlineSalesToday;
+    const totalItemsSold = offlineItemsCount + onlineItemsCount;
+    const totalProfit = offlineProfitToday;
+    const onlineOrdersCount = ordersToday.length;
 
-    // Hourly bar chart data (6AM to 9PM) comparing Online vs Offline
-    const hourlyData = [
-      { time: '6AM', online: 30, offline: 65 },
-      { time: '7AM', online: 45, offline: 80 },
-      { time: '8AM', online: 60, offline: 95 },
-      { time: '9AM', online: 95, offline: 110 },
-      { time: '10AM', online: 120, offline: 130 },
-      { time: '11AM', online: 110, offline: 140 },
-      { time: '12PM', online: 150, offline: 175 },
-      { time: '1PM', online: 125, offline: 140 },
-      { time: '2PM', online: 100, offline: 120 },
-      { time: '3PM', online: 80, offline: 90 },
-      { time: '4PM', online: 115, offline: 125 },
-      { time: '5PM', online: 140, offline: 155 },
-      { time: '6PM', online: 160, offline: 170 },
-      { time: '7PM', online: 135, offline: 145 },
-      { time: '8PM', online: 90, offline: 110 },
-      { time: '9PM', online: 70, offline: 85 },
-    ];
+    // Growth comparison calculation
+    const yesterdaySalesTotal =
+      salesYesterday.reduce((sum, s) => sum + (s.totalAmount || 0), 0) +
+      ordersYesterday.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
 
-    // Top Selling Items
-    const topSellingItems = [
-      { rank: 1, item: 'Maggi Noodles', sold: 24, revenue: 288, brand: 'Nestle' },
-      { rank: 2, item: 'Coca Cola', sold: 18, revenue: 720, brand: 'Coca Cola' },
-      { rank: 3, item: 'Lays Classic', sold: 16, revenue: 320, brand: 'Lays' },
-      { rank: 4, item: 'Amul Milk', sold: 14, revenue: 392, brand: 'Amul' },
-      { rank: 5, item: 'Parle-G', sold: 12, revenue: 120, brand: 'Parle' },
-    ];
+    const yesterdayItemsSold =
+      salesYesterday.reduce((sum, s) => sum + (s.items || []).reduce((iSum, item) => iSum + (item.quantity || 0), 0), 0) +
+      ordersYesterday.reduce((sum, o) => sum + (o.items || []).reduce((iSum, item) => iSum + (item.quantity || 0), 0), 0);
 
-    // Low stock items from database
+    const yesterdayProfit = salesYesterday.reduce((sum, s) => sum + (s.grossProfit || 0), 0);
+    const yesterdayOrdersCount = ordersYesterday.length;
+
+    const formatGrowth = (current, previous) => {
+      if (previous === 0) {
+        return current > 0 ? '+100%' : '0%';
+      }
+      const diff = ((current - previous) / previous) * 100;
+      const rounded = Math.round(diff);
+      return `${rounded >= 0 ? '+' : ''}${rounded}%`;
+    };
+
+    const salesGrowth = formatGrowth(totalSalesAmount, yesterdaySalesTotal);
+    const itemsGrowth = formatGrowth(totalItemsSold, yesterdayItemsSold);
+    const profitGrowth = formatGrowth(totalProfit, yesterdayProfit);
+    const ordersGrowth = formatGrowth(onlineOrdersCount, yesterdayOrdersCount);
+
+    // Hourly bar chart data (6AM to 9PM) comparing real Online vs Offline
+    const hours = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
+    const hourlyData = hours.map((hour) => {
+      const label = hour === 12 ? '12PM' : hour > 12 ? `${hour - 12}PM` : `${hour}AM`;
+
+      const offlineInHour = salesToday
+        .filter((s) => new Date(s.createdAt).getHours() === hour)
+        .reduce((sum, s) => sum + (s.totalAmount || 0), 0);
+
+      const onlineInHour = ordersToday
+        .filter((o) => new Date(o.createdAt).getHours() === hour)
+        .reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+
+      return {
+        time: label,
+        online: onlineInHour,
+        offline: offlineInHour,
+      };
+    });
+
+    // Top Selling Items calculated dynamically from all completed sales & orders
+    const allSales = await Sale.find({ businessId: activeBusinessId });
+    const allOrders = await Order.find({
+      businessId: activeBusinessId,
+      orderStatus: { $ne: 'Cancelled' },
+    });
+
+    const itemMap = {};
+
+    allSales.forEach((s) => {
+      (s.items || []).forEach((it) => {
+        const key = it.productId?.toString() || it.name;
+        if (!itemMap[key]) {
+          itemMap[key] = {
+            item: it.name,
+            brand: it.brand || '',
+            sold: 0,
+            revenue: 0,
+          };
+        }
+        itemMap[key].sold += it.quantity || 0;
+        itemMap[key].revenue += it.total || ((it.price || 0) * (it.quantity || 0));
+      });
+    });
+
+    allOrders.forEach((o) => {
+      (o.items || []).forEach((it) => {
+        const key = it.productId?.toString() || it.name;
+        if (!itemMap[key]) {
+          itemMap[key] = {
+            item: it.name,
+            brand: '',
+            sold: 0,
+            revenue: 0,
+          };
+        }
+        itemMap[key].sold += it.quantity || 0;
+        itemMap[key].revenue += it.total || ((it.price || 0) * (it.quantity || 0));
+      });
+    });
+
+    const topSellingItems = Object.values(itemMap)
+      .sort((a, b) => b.sold - a.sold || b.revenue - a.revenue)
+      .slice(0, 5)
+      .map((it, idx) => ({
+        rank: idx + 1,
+        ...it,
+      }));
+
+    // Low stock items directly from DB (no static mock fallbacks)
     const lowStockItemsDb = await Product.find({
-      tenantId: req.tenantId,
+      businessId: activeBusinessId,
       isArchived: false,
       $expr: { $lte: ['$stock', '$lowStockThreshold'] },
-    }).limit(5);
+    })
+      .sort({ stock: 1 })
+      .limit(5);
 
-    const lowStockItems = lowStockItemsDb.length > 0
-      ? lowStockItemsDb.map((p, idx) => ({
-          rank: idx + 1,
-          image: p.image,
-          itemName: p.name,
-          brand: p.brand,
-          stock: p.stock,
-        }))
-      : [
-          {
-            rank: 1,
-            image: 'https://images.unsplash.com/photo-1612927601601-6638404737ce?auto=format&fit=crop&w=100&q=80',
-            itemName: 'Maggi Noodles',
-            brand: 'Nestle',
-            stock: 3,
-          },
-          {
-            rank: 2,
-            image: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=100&q=80',
-            itemName: 'Coca Cola',
-            brand: 'Coca Cola',
-            stock: 5,
-          },
-          {
-            rank: 3,
-            image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?auto=format&fit=crop&w=100&q=80',
-            itemName: 'Lays Classic',
-            brand: 'Lays',
-            stock: 4,
-          },
-        ];
+    const lowStockItems = lowStockItemsDb.map((p, idx) => ({
+      rank: idx + 1,
+      image: p.image || '',
+      itemName: p.name,
+      brand: p.brand || 'General',
+      stock: p.stock,
+    }));
 
-    // Recent mixed orders & offline bills
-    const recentBills = await Sale.find({ tenantId: req.tenantId }).sort({ createdAt: -1 }).limit(3);
-    const recentOnline = await Order.find({ tenantId: req.tenantId }).sort({ createdAt: -1 }).limit(3);
+    // Recent orders and bills (real data merged & sorted)
+    const recentBills = await Sale.find({ businessId: activeBusinessId })
+      .sort({ createdAt: -1 })
+      .limit(5);
 
-    const recentOrders = [
-      { id: '#1001', customer: 'Walk-in', type: 'Offline', amount: 320, status: 'Completed' },
-      { id: '#1002', customer: 'Online Customer', type: 'Online', amount: 450, status: 'Processing' },
-      { id: '#1003', customer: 'Walk-in', type: 'Offline', amount: 210, status: 'Completed' },
-      { id: '#1004', customer: 'Rahul Mehta', type: 'Online', amount: 620, status: 'Pending' },
-      { id: '#1005', customer: 'Sneha Kapoor', type: 'Online', amount: 280, status: 'Delivered' },
+    const recentOnline = await Order.find({ businessId: activeBusinessId })
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    const combinedOrders = [
+      ...recentBills.map((s) => ({
+        id: s.billNumber || `#${s.sequenceNumber}`,
+        customer: s.customerName || 'Walk-in',
+        type: 'Offline',
+        amount: s.totalAmount,
+        status: s.paymentStatus === 'paid' ? 'Completed' : s.paymentStatus,
+        createdAt: s.createdAt,
+      })),
+      ...recentOnline.map((o) => ({
+        id: o.orderNumber || `#${o.sequenceNumber}`,
+        customer: o.customer?.name || 'Customer',
+        type: 'Online',
+        amount: o.totalAmount,
+        status: o.orderStatus,
+        createdAt: o.createdAt,
+      })),
     ];
+
+    combinedOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const recentOrders = combinedOrders.slice(0, 5);
 
     res.json({
       success: true,
       data: {
         kpis: {
           todaySales: totalSalesAmount,
-          salesGrowth: '+12%',
+          salesGrowth,
           itemsSold: totalItemsSold,
-          itemsGrowth: '+8%',
+          itemsGrowth,
           profit: totalProfit,
-          profitGrowth: '+18%',
+          profitGrowth,
           onlineOrders: onlineOrdersCount,
-          ordersGrowth: '+5%',
+          ordersGrowth,
         },
         salesOverview: hourlyData,
         topSellingItems,
@@ -141,6 +226,7 @@ export const getDashboardMetrics = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error('[Dashboard Metrics Error]:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -150,16 +236,81 @@ export const getDashboardMetrics = async (req, res) => {
 export const getFinancialReport = async (req, res) => {
   try {
     const { range = '30d' } = req.query;
+    const activeBusinessId = req.businessId || req.tenantId;
 
-    const sales = await Sale.find({ tenantId: req.tenantId });
-    const orders = await Order.find({ tenantId: req.tenantId });
+    let startDate = new Date();
+    if (range === '7d') startDate.setDate(startDate.getDate() - 7);
+    else if (range === '30d') startDate.setDate(startDate.getDate() - 30);
+    else if (range === '90d') startDate.setDate(startDate.getDate() - 90);
+    else if (range === '1y') startDate.setFullYear(startDate.getFullYear() - 1);
+    else startDate.setDate(startDate.getDate() - 30);
+    startDate.setHours(0, 0, 0, 0);
 
-    const totalOfflineRevenue = sales.reduce((acc, s) => acc + s.totalAmount, 0);
-    const totalOnlineRevenue = orders.reduce((acc, o) => acc + o.totalAmount, 0);
+    const sales = await Sale.find({
+      businessId: activeBusinessId,
+      createdAt: { $gte: startDate },
+    });
+
+    const orders = await Order.find({
+      businessId: activeBusinessId,
+      createdAt: { $gte: startDate },
+      orderStatus: { $ne: 'Cancelled' },
+    });
+
+    const totalOfflineRevenue = sales.reduce((acc, s) => acc + (s.totalAmount || 0), 0);
+    const totalOnlineRevenue = orders.reduce((acc, o) => acc + (o.totalAmount || 0), 0);
     const grossRevenue = totalOfflineRevenue + totalOnlineRevenue;
     const totalCogs = sales.reduce((acc, s) => acc + (s.cogs || 0), 0);
     const grossProfit = grossRevenue - totalCogs;
-    const totalCashReceived = sales.filter((s) => s.paymentMethod === 'Cash').reduce((acc, s) => acc + s.totalAmount, 0);
+    const totalCashReceived = sales
+      .filter((s) => s.paymentMethod === 'Cash')
+      .reduce((acc, s) => acc + (s.totalAmount || 0), 0);
+
+    // Dynamic category breakdown from real sales
+    const categoryTotals = {};
+    sales.forEach((s) => {
+      (s.items || []).forEach((item) => {
+        const cat = item.category || 'General';
+        categoryTotals[cat] = (categoryTotals[cat] || 0) + (item.total || ((item.price || 0) * (item.quantity || 1)));
+      });
+    });
+
+    const categoryData = Object.entries(categoryTotals).map(([name, value]) => ({
+      name,
+      value,
+    }));
+
+    // Weekly/daily trend dynamically calculated
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const trendMap = {};
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dayKey = dayNames[d.getDay()];
+      trendMap[dayKey] = {
+        day: dayKey,
+        revenue: 0,
+        profit: 0,
+      };
+    }
+
+    sales.forEach((s) => {
+      const dayKey = dayNames[new Date(s.createdAt).getDay()];
+      if (trendMap[dayKey]) {
+        trendMap[dayKey].revenue += s.totalAmount || 0;
+        trendMap[dayKey].profit += s.grossProfit || 0;
+      }
+    });
+
+    orders.forEach((o) => {
+      const dayKey = dayNames[new Date(o.createdAt).getDay()];
+      if (trendMap[dayKey]) {
+        trendMap[dayKey].revenue += o.totalAmount || 0;
+      }
+    });
+
+    const weeklyTrend = Object.values(trendMap);
 
     res.json({
       success: true,
@@ -172,9 +323,12 @@ export const getFinancialReport = async (req, res) => {
         totalCashReceived,
         salesCount: sales.length,
         ordersCount: orders.length,
+        categoryData,
+        weeklyTrend,
       },
     });
   } catch (error) {
+    console.error('[Financial Report Error]:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
