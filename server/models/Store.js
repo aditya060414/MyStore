@@ -2,9 +2,9 @@ import mongoose from 'mongoose';
 
 const storeSchema = new mongoose.Schema(
   {
-    tenantId: {
+    businessId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Tenant',
+      ref: 'Business',
       required: true,
       index: true,
     },
@@ -13,9 +13,14 @@ const storeSchema = new mongoose.Schema(
       required: [true, 'Store name is required'],
       trim: true,
     },
+    handle: {
+      type: String,
+      lowercase: true,
+      trim: true,
+      index: true,
+    },
     slug: {
       type: String,
-      required: [true, 'Store slug is required'],
       lowercase: true,
       trim: true,
       index: true,
@@ -56,10 +61,25 @@ const storeSchema = new mongoose.Schema(
       default: 'Your one-stop daily essentials, groceries, beverages and snacks store.',
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  }
 );
 
-// Compound index for uniqueness within tenant
-storeSchema.index({ tenantId: 1, slug: 1 }, { unique: true });
+storeSchema.pre('save', function (next) {
+  if (!this.handle && this.slug) this.handle = this.slug;
+  if (!this.slug && this.handle) this.slug = this.handle;
+  next();
+});
+
+storeSchema.virtual('storeHandle').get(function () {
+  return this.handle || this.slug;
+});
+
+// Compound index for uniqueness within business
+storeSchema.index({ businessId: 1, slug: 1 }, { unique: true });
+storeSchema.index({ businessId: 1, handle: 1 });
 
 export default mongoose.model('Store', storeSchema);
