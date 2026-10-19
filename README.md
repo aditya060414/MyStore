@@ -1,17 +1,17 @@
-# MyStore — Multi-Tenant Retail Management SaaS
+# BisonMooves Store — Multi-Business Retail Management SaaS
 
-A commercial, production-ready, multi-tenant retail SaaS platform engineered for independent retail shops, grocery stores, supermarkets, and convenience businesses.
+A commercial, production-ready, multi-business retail SaaS platform engineered for independent retail shops, grocery stores, supermarkets, and convenience businesses.
 
 ## Key Capabilities
 
-- **Strict Multi-Tenant Architecture**: Each business tenant has completely isolated products, inventory, customers, sales, orders, reports, and staff access.
+- **Strict Multi-Business Architecture**: Each business has completely isolated products, inventory, customers, sales, orders, reports, and staff access.
 - **Point of Sale (POS) & Live Billing**: Fast product search, barcode scanner integration, customer lookup, quantity controls, discount & tax calculations, and real-time A4 / Thermal bill preview with barcode.
 - **Inventory & Stock Management**: Product catalog with SKU, brand, category, selling price, purchase cost (COGS snapshot), stock threshold alerts, and 15-day expiry warnings.
 - **Online Storefront**: Dedicated customer-facing digital storefront (`/store/:storeSlug`) with categories, search, shopping cart, delivery address checkout, and order status tracking.
 - **Share Store & QR Marketing**: Instant store sharing via WhatsApp, Twitter, Facebook, plus auto-generated high-res QR codes and printable countertop stand posters.
 - **Reports & Analytics**: Daily/weekly/monthly revenue tracking, gross profit analysis, cost of goods sold (COGS) deduction, online vs. offline sales comparison, and category distribution.
 - **Staff Roles & RBAC**: Role-based permissions for Owner, Manager, Cashier (POS-only), and Inventory Manager.
-- **Platform Admin Console**: Private dashboard for the SaaS operator to monitor MRR, ARR, tenant health, churn, and plan subscriptions.
+- **Platform Admin Console**: Private dashboard for the SaaS operator to monitor MRR, ARR, business health, churn, and plan subscriptions.
 
 ---
 
@@ -29,23 +29,22 @@ A commercial, production-ready, multi-tenant retail SaaS platform engineered for
 ├── client/                     # Vite + React 19 Frontend
 │   ├── src/
 │   │   ├── components/layout/  # Sidebar, Navbar, AppLayout
-│   │   ├── context/            # AuthContext (multi-tenant session & switching)
+│   │   ├── context/            # AuthContext (multi-business session & switching)
 │   │   ├── pages/
 │   │   │   ├── merchant/       # Dashboard, Inventory, Bill Format, Orders, Reports, History, Share Store, Settings
 │   │   │   ├── public/         # Online Storefront & Order Tracking
 │   │   │   ├── platform/       # SaaS Operator Platform Admin Console
 │   │   │   ├── marketing/      # Public Landing Page & Features
 │   │   │   └── auth/           # Login, Register, Onboarding Wizard
-│   │   └── services/           # API Client with Tenant Scoping Headers
+│   │   └── services/           # API Client with Business Scoping Headers
 │   └── package.json
 │
 ├── server/                     # Node.js + Express REST API
 │   ├── config/                 # Database connection & config
-│   ├── controllers/            # Auth, Tenant, Product, Sale, Order, Report, History, Subscription, Platform
-│   ├── middleware/             # Auth, Tenant Isolation, RBAC, Error Handling
-│   ├── models/                 # User, Tenant, Store, Membership, Plan, Subscription, Product, Customer, Sale, Order, InventoryMovement, AuditLog
+│   ├── controllers/            # Auth, Business, Product, Sale, Order, Report, History, Subscription, Platform
+│   ├── middleware/             # Auth, Business Isolation, RBAC, Error Handling
+│   ├── models/                 # User, Business, Store, Membership, Plan, Subscription, Product, Customer, Sale, Order, InventoryMovement, AuditLog
 │   ├── routes/                 # Versioned REST endpoints (/api/v1/...)
-│   ├── seed/                   # Database seed script
 │   └── server.js               # Express application entrypoint
 │
 └── .gitignore
@@ -59,8 +58,7 @@ A commercial, production-ready, multi-tenant retail SaaS platform engineered for
 ```bash
 cd server
 npm install
-npm run seed     # Pre-populates SaaS plans, demo tenants, and sample products
-npm run dev      # Starts server on http://localhost:5000
+npm run dev      # Starts server on http://localhost:5000 (auto-initializes foundational SaaS plans)
 ```
 
 ### 2. Frontend Client Setup
@@ -72,11 +70,8 @@ npm run dev      # Starts client on http://localhost:5173
 
 ---
 
-## Demo Accounts
+## Getting Started
 
-| Role | Email | Password | Access Scope |
-| :--- | :--- | :--- | :--- |
-| **Apex Supermarket Owner** | `rahul@apexretail.com` | `password123` | Full Merchant Dashboard & Settings |
-| **Apex Cashier** | `sneha@apexretail.com` | `password123` | POS Billing & Cashier Desk |
-| **Platform Operator** | `admin@mystore.com` | `admin123` | SaaS Console (`/platform`), MRR & Tenants |
-| **GreenMart Organics Owner** | `pooja@greenmart.com` | `password123` | Demonstrates complete multi-tenant isolation |
+1. **Sign Up**: Navigate to `/signup` to register your merchant account.
+2. **Onboard Your Business**: Follow the 3-step onboarding wizard to register your business name, primary store branch, and choose a subscription plan.
+3. **Add Products & Start Selling**: Use the POS Terminal and Inventory Manager to add your inventory, scan barcodes, and generate bills.
