@@ -87,10 +87,9 @@ const planSchema = new mongoose.Schema(
   }
 );
 
-planSchema.pre('save', function (next) {
+planSchema.pre('save', function () {
   if (!this.handle && this.slug) this.handle = this.slug;
   if (!this.slug && this.handle) this.slug = this.handle;
-  next();
 });
 
 planSchema.virtual('planKey').get(function () {
