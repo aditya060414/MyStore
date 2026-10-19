@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { toast } from 'react-toastify';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -13,17 +14,26 @@ import {
 } from 'lucide-react';
 
 export const OnboardingPage = () => {
-  const { setActiveTenant } = useAuth();
+  const { setActiveBusiness, setActiveTenant } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
 
   const [businessName, setBusinessName] = useState('');
   const [storeName, setStoreName] = useState('');
+  const [storeHandle, setStoreHandle] = useState('');
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('Bangalore');
   const [address, setAddress] = useState('123 Market Street');
-  const [planSlug, setPlanSlug] = useState('pro');
+  const [planSlug, setPlanSlug] = useState('free');
   const [submitting, setSubmitting] = useState(false);
+
+  const formatHandle = (val) => {
+    if (!val) return '';
+    return val
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)+/g, '');
+  };
 
   const handleFinish = async (e) => {
     e.preventDefault();
@@ -32,20 +42,25 @@ export const OnboardingPage = () => {
       const payload = {
         businessName,
         storeName: storeName || businessName,
+        storeHandle: storeHandle || formatHandle(storeName || businessName),
         phone,
         city,
         address,
         planSlug,
+        planHandle: planSlug,
       };
 
-      const res = await api.onboardTenant(payload);
+      const res = await api.onboardBusiness(payload);
       if (res.success && res.data) {
-        setActiveTenant(res.data.tenant);
-        api.setActiveTenantId(res.data.tenant._id);
+        const b = res.data.business || res.data.tenant;
+        if (setActiveBusiness) setActiveBusiness(b);
+        if (setActiveTenant) setActiveTenant(b);
+        api.setActiveBusinessId(b._id);
+        toast.success('Store setup completed successfully! Welcome to your dashboard.');
         navigate('/app/dashboard');
       }
     } catch (err) {
-      alert(`Onboarding error: ${err.message}`);
+      toast.error(`Onboarding error: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -90,7 +105,7 @@ export const OnboardingPage = () => {
                   placeholder="e.g. Apex Supermarket"
                   className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 font-medium focus:outline-none focus:border-blue-500"
                 />
-                <p className="text-[10px] text-slate-400 mt-1">This will be your legal merchant tenant name</p>
+                <p className="text-[10px] text-slate-400 mt-1">This will be your legal business name</p>
               </div>
 
               <div>
@@ -127,10 +142,30 @@ export const OnboardingPage = () => {
                   type="text"
                   required
                   value={storeName}
-                  onChange={(e) => setStoreName(e.target.value)}
+                  onChange={(e) => {
+                    setStoreName(e.target.value);
+                    if (!storeHandle) {
+                      setStoreHandle(formatHandle(e.target.value));
+                    }
+                  }}
                   placeholder={businessName ? `${businessName} - Main Branch` : 'e.g. Indiranagar Store'}
                   className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 font-medium focus:outline-none focus:border-blue-500"
                 />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Store Handle (Online Link)</label>
+                <div className="flex items-center">
+                  <span className="bg-slate-100 border border-r-0 border-slate-200 rounded-l-xl px-3 py-2.5 text-slate-500 font-mono text-[11px]">/store/</span>
+                  <input
+                    type="text"
+                    value={storeHandle}
+                    onChange={(e) => setStoreHandle(formatHandle(e.target.value))}
+                    placeholder={formatHandle(storeName || businessName) || 'my-store'}
+                    className="flex-1 bg-[#f8fafc] border border-slate-200 rounded-r-xl px-3 py-2.5 text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">Direct web link for customer orders and QR sharing.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -185,17 +220,18 @@ export const OnboardingPage = () => {
               <div className="space-y-2.5">
                 {[
                   {
-                    slug: 'pro',
-                    name: 'Pro Retailer (Recommended)',
-                    price: '₹999 / mo',
-                    desc: '500 products, online storefront, QR store sharing, profit reports',
-                    badge: '14-Day Free Trial',
-                  },
-                  {
                     slug: 'free',
-                    name: 'Free Tier',
+                    name: 'Free Starter (Default)',
                     price: '₹0',
                     desc: '50 products, basic POS billing, thermal receipts',
+                    badge: 'Default',
+                  },
+                  {
+                    slug: 'pro',
+                    name: 'Pro Retailer',
+                    price: '₹999 / mo',
+                    desc: '500 products, online storefront, QR store sharing, profit reports',
+                    badge: 'Upgrade Available',
                   },
                   {
                     slug: 'business',
@@ -244,7 +280,7 @@ export const OnboardingPage = () => {
                   onClick={handleFinish}
                   className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-500/25 transition-all cursor-pointer"
                 >
-                  <span>{submitting ? 'Launching Store...' : 'Launch MyStore Dashboard'}</span>
+                  <span>{submitting ? 'Launching Store...' : 'Launch BisonMooves Store Dashboard'}</span>
                   <Sparkles className="w-4 h-4" />
                 </button>
               </div>
