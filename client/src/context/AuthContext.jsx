@@ -124,8 +124,8 @@ export const AuthProvider = ({ children }) => {
     initAuth();
   }, []);
 
-  const login = async (email, password) => {
-    const res = await api.login(email, password);
+  const login = async (phoneOrEmail, password) => {
+    const res = await api.login(phoneOrEmail, password);
     if (res.success && res.data) {
       setUser(res.data);
       api.setToken(res.data.token);
