@@ -31,9 +31,9 @@ const orderItemSchema = new mongoose.Schema({
 
 const orderSchema = new mongoose.Schema(
   {
-    tenantId: {
+    businessId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Tenant',
+      ref: 'Business',
       required: true,
       index: true,
     },
@@ -100,7 +100,7 @@ const orderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-orderSchema.index({ tenantId: 1, sequenceNumber: -1 });
-orderSchema.index({ tenantId: 1, createdAt: -1 });
+orderSchema.index({ businessId: 1, sequenceNumber: -1 });
+orderSchema.index({ businessId: 1, createdAt: -1 });
 
 export default mongoose.model('Order', orderSchema);
