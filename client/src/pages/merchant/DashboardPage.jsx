@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import {
   ShoppingCart,
   Store,
@@ -7,8 +8,13 @@ import {
   FileText,
   Calendar,
   ArrowUpRight,
+  ArrowDownRight,
   TrendingUp,
   ChevronDown,
+  ShoppingBag,
+  CheckCircle2,
+  PackageX,
+  Clock,
 } from 'lucide-react';
 import {
   BarChart,
@@ -22,11 +28,14 @@ import {
 import { Link } from 'react-router-dom';
 
 export const DashboardPage = () => {
+  const { activeBusiness, activeTenant } = useAuth();
+  const currentBusinessId = activeBusiness?._id || activeTenant?._id;
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchMetrics = async () => {
+      setLoading(true);
       try {
         const res = await api.getDashboardMetrics();
         if (res.success) {
@@ -39,77 +48,48 @@ export const DashboardPage = () => {
       }
     };
     fetchMetrics();
-  }, []);
+  }, [currentBusinessId]);
 
   const kpis = data?.kpis || {
-    todaySales: 12450,
-    salesGrowth: '+12%',
-    itemsSold: 43,
-    itemsGrowth: '+8%',
-    profit: 3820,
-    profitGrowth: '+18%',
-    onlineOrders: 12,
-    ordersGrowth: '+5%',
+    todaySales: 0,
+    salesGrowth: '0%',
+    itemsSold: 0,
+    itemsGrowth: '0%',
+    profit: 0,
+    profitGrowth: '0%',
+    onlineOrders: 0,
+    ordersGrowth: '0%',
   };
 
   const chartData = data?.salesOverview || [
-    { time: '6AM', online: 30, offline: 65 },
-    { time: '7AM', online: 45, offline: 80 },
-    { time: '8AM', online: 60, offline: 95 },
-    { time: '9AM', online: 95, offline: 110 },
-    { time: '10AM', online: 120, offline: 130 },
-    { time: '11AM', online: 110, offline: 140 },
-    { time: '12PM', online: 150, offline: 175 },
-    { time: '1PM', online: 125, offline: 140 },
-    { time: '2PM', online: 100, offline: 120 },
-    { time: '3PM', online: 80, offline: 90 },
-    { time: '4PM', online: 115, offline: 125 },
-    { time: '5PM', online: 140, offline: 155 },
-    { time: '6PM', online: 160, offline: 170 },
-    { time: '7PM', online: 135, offline: 145 },
-    { time: '8PM', online: 90, offline: 110 },
-    { time: '9PM', online: 70, offline: 85 },
+    { time: '6AM', online: 0, offline: 0 },
+    { time: '7AM', online: 0, offline: 0 },
+    { time: '8AM', online: 0, offline: 0 },
+    { time: '9AM', online: 0, offline: 0 },
+    { time: '10AM', online: 0, offline: 0 },
+    { time: '11AM', online: 0, offline: 0 },
+    { time: '12PM', online: 0, offline: 0 },
+    { time: '1PM', online: 0, offline: 0 },
+    { time: '2PM', online: 0, offline: 0 },
+    { time: '3PM', online: 0, offline: 0 },
+    { time: '4PM', online: 0, offline: 0 },
+    { time: '5PM', online: 0, offline: 0 },
+    { time: '6PM', online: 0, offline: 0 },
+    { time: '7PM', online: 0, offline: 0 },
+    { time: '8PM', online: 0, offline: 0 },
+    { time: '9PM', online: 0, offline: 0 },
   ];
 
-  const topItems = data?.topSellingItems || [
-    { rank: 1, item: 'Maggi Noodles', sold: 24, revenue: 288 },
-    { rank: 2, item: 'Coca Cola', sold: 18, revenue: 720 },
-    { rank: 3, item: 'Lays Classic', sold: 16, revenue: 320 },
-    { rank: 4, item: 'Amul Milk', sold: 14, revenue: 392 },
-    { rank: 5, item: 'Parle-G', sold: 12, revenue: 120 },
-  ];
+  const topItems = data?.topSellingItems || [];
+  const lowStock = data?.lowStockItems || [];
+  const recentOrders = data?.recentOrders || [];
 
-  const lowStock = data?.lowStockItems || [
-    {
-      rank: 1,
-      image: 'https://images.unsplash.com/photo-1612927601601-6638404737ce?auto=format&fit=crop&w=100&q=80',
-      itemName: 'Maggi Noodles',
-      brand: 'Nestle',
-      stock: 3,
-    },
-    {
-      rank: 2,
-      image: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=100&q=80',
-      itemName: 'Coca Cola',
-      brand: 'Coca Cola',
-      stock: 5,
-    },
-    {
-      rank: 3,
-      image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?auto=format&fit=crop&w=100&q=80',
-      itemName: 'Lays Classic',
-      brand: 'Lays',
-      stock: 4,
-    },
-  ];
-
-  const recentOrders = data?.recentOrders || [
-    { id: '#1001', customer: 'Walk-in', type: 'Offline', amount: 320, status: 'Completed' },
-    { id: '#1002', customer: 'Online Customer', type: 'Online', amount: 450, status: 'Processing' },
-    { id: '#1003', customer: 'Walk-in', type: 'Offline', amount: 210, status: 'Completed' },
-    { id: '#1004', customer: 'Rahul Mehta', type: 'Online', amount: 620, status: 'Pending' },
-    { id: '#1005', customer: 'Sneha Kapoor', type: 'Online', amount: 280, status: 'Delivered' },
-  ];
+  // Dynamic chart Y scale
+  const maxVal = Math.max(
+    ...chartData.map((d) => Math.max(Number(d.online) || 0, Number(d.offline) || 0)),
+    50
+  );
+  const chartYMax = Math.ceil(maxVal * 1.2);
 
   const currentDateStr = new Date().toLocaleDateString('en-GB', {
     weekday: 'short',
@@ -117,6 +97,52 @@ export const DashboardPage = () => {
     month: 'short',
     year: 'numeric',
   });
+
+  const renderGrowthBadge = (growthStr) => {
+    const isNegative = growthStr && growthStr.startsWith('-');
+    const isZero = !growthStr || growthStr === '0%' || growthStr === '+0%';
+
+    if (isZero) {
+      return (
+        <span className="inline-flex items-center text-xs font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">
+          0%
+        </span>
+      );
+    }
+
+    if (isNegative) {
+      return (
+        <span className="inline-flex items-center gap-0.5 text-xs font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded-lg">
+          <ArrowDownRight className="w-3 h-3" />
+          {growthStr}
+        </span>
+      );
+    }
+
+    return (
+      <span className="inline-flex items-center gap-0.5 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
+        <ArrowUpRight className="w-3 h-3" />
+        {growthStr}
+      </span>
+    );
+  };
+
+  if (loading && !data) {
+    return (
+      <div className="space-y-6 max-w-7xl mx-auto animate-pulse">
+        <div className="h-10 bg-slate-200 rounded-xl w-64"></div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-28 bg-slate-200 rounded-2xl"></div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-7 h-80 bg-slate-200 rounded-2xl"></div>
+          <div className="lg:col-span-5 h-80 bg-slate-200 rounded-2xl"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -132,7 +158,7 @@ export const DashboardPage = () => {
         </div>
       </div>
 
-      {/* KPI Cards Row (Matching screenshot exact layout and colors) */}
+      {/* KPI Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {/* Today's Sales */}
         <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm hover:shadow transition-shadow flex items-center justify-between">
@@ -143,15 +169,12 @@ export const DashboardPage = () => {
             <div>
               <p className="text-xs font-medium text-slate-500">Today's Sales</p>
               <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-0.5">
-                ₹ {kpis.todaySales.toLocaleString()}
+                ₹ {Number(kpis.todaySales || 0).toLocaleString()}
               </h3>
               <p className="text-[11px] text-slate-400 mt-0.5">vs yesterday</p>
             </div>
           </div>
-          <span className="inline-flex items-center gap-0.5 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
-            <ArrowUpRight className="w-3 h-3" />
-            {kpis.salesGrowth}
-          </span>
+          {renderGrowthBadge(kpis.salesGrowth)}
         </div>
 
         {/* Items Sold */}
@@ -163,15 +186,12 @@ export const DashboardPage = () => {
             <div>
               <p className="text-xs font-medium text-slate-500">Items Sold</p>
               <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-0.5">
-                {kpis.itemsSold}
+                {kpis.itemsSold || 0}
               </h3>
               <p className="text-[11px] text-slate-400 mt-0.5">vs yesterday</p>
             </div>
           </div>
-          <span className="inline-flex items-center gap-0.5 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
-            <ArrowUpRight className="w-3 h-3" />
-            {kpis.itemsGrowth}
-          </span>
+          {renderGrowthBadge(kpis.itemsGrowth)}
         </div>
 
         {/* Profit */}
@@ -183,15 +203,12 @@ export const DashboardPage = () => {
             <div>
               <p className="text-xs font-medium text-slate-500">Profit</p>
               <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-0.5">
-                ₹ {kpis.profit.toLocaleString()}
+                ₹ {Number(kpis.profit || 0).toLocaleString()}
               </h3>
               <p className="text-[11px] text-slate-400 mt-0.5">vs yesterday</p>
             </div>
           </div>
-          <span className="inline-flex items-center gap-0.5 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
-            <ArrowUpRight className="w-3 h-3" />
-            {kpis.profitGrowth}
-          </span>
+          {renderGrowthBadge(kpis.profitGrowth)}
         </div>
 
         {/* Online Orders */}
@@ -203,15 +220,12 @@ export const DashboardPage = () => {
             <div>
               <p className="text-xs font-medium text-slate-500">Online Orders</p>
               <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-0.5">
-                {kpis.onlineOrders}
+                {kpis.onlineOrders || 0}
               </h3>
               <p className="text-[11px] text-slate-400 mt-0.5">vs yesterday</p>
             </div>
           </div>
-          <span className="inline-flex items-center gap-0.5 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
-            <ArrowUpRight className="w-3 h-3" />
-            {kpis.ordersGrowth}
-          </span>
+          {renderGrowthBadge(kpis.ordersGrowth)}
         </div>
       </div>
 
@@ -234,9 +248,8 @@ export const DashboardPage = () => {
                   Offline
                 </span>
               </div>
-              <div className="flex items-center gap-1 text-xs font-medium bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg text-slate-600 cursor-pointer">
+              <div className="flex items-center gap-1 text-xs font-medium bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg text-slate-600">
                 <span>Today</span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </div>
             </div>
           </div>
@@ -246,9 +259,16 @@ export const DashboardPage = () => {
               <BarChart data={chartData} barGap={3} barCategoryGap="20%">
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} domain={[0, 200]} />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#94a3b8', fontSize: 11 }}
+                  domain={[0, chartYMax]}
+                  tickFormatter={(val) => `₹${val}`}
+                />
                 <Tooltip
                   cursor={{ fill: '#f8fafc' }}
+                  formatter={(value, name) => [`₹${value}`, name === 'online' ? 'Online Orders' : 'POS Sales']}
                   contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
                 />
                 <Bar dataKey="online" fill="#2563eb" radius={[4, 4, 0, 0]} />
@@ -268,28 +288,38 @@ export const DashboardPage = () => {
               </Link>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-100 text-slate-400 font-medium">
-                    <th className="py-2.5 font-medium">#</th>
-                    <th className="py-2.5 font-medium">Item</th>
-                    <th className="py-2.5 font-medium text-center">Sold</th>
-                    <th className="py-2.5 font-medium text-right">Revenue</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50 font-medium text-slate-700">
-                  {topItems.map((item) => (
-                    <tr key={item.rank} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-3 text-slate-400">{item.rank}</td>
-                      <td className="py-3 font-semibold text-slate-800">{item.item}</td>
-                      <td className="py-3 text-center">{item.sold}</td>
-                      <td className="py-3 text-right font-semibold text-slate-900">₹{item.revenue}</td>
+            {topItems.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-slate-400 font-medium">
+                      <th className="py-2.5 font-medium">#</th>
+                      <th className="py-2.5 font-medium">Item</th>
+                      <th className="py-2.5 font-medium text-center">Sold</th>
+                      <th className="py-2.5 font-medium text-right">Revenue</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 font-medium text-slate-700">
+                    {topItems.map((item) => (
+                      <tr key={item.rank} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="py-3 text-slate-400">{item.rank}</td>
+                        <td className="py-3 font-semibold text-slate-800">{item.item}</td>
+                        <td className="py-3 text-center">{item.sold}</td>
+                        <td className="py-3 text-right font-semibold text-slate-900">₹{item.revenue}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="py-14 text-center">
+                <ShoppingBag className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <p className="text-xs font-semibold text-slate-600">No items sold yet</p>
+                <p className="text-[11px] text-slate-400 mt-1 max-w-xs mx-auto">
+                  Top performing items will automatically appear here once sales are recorded.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -305,36 +335,56 @@ export const DashboardPage = () => {
             </Link>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 text-slate-400 font-medium">
-                  <th className="py-2.5 font-medium">#</th>
-                  <th className="py-2.5 font-medium">Image</th>
-                  <th className="py-2.5 font-medium">Item Name</th>
-                  <th className="py-2.5 font-medium">Brand</th>
-                  <th className="py-2.5 font-medium text-center">Stock</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50 font-medium text-slate-700">
-                {lowStock.map((item) => (
-                  <tr key={item.rank} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="py-2.5 text-slate-400">{item.rank}</td>
-                    <td className="py-2.5">
-                      <img src={item.image} alt={item.itemName} className="w-8 h-8 rounded-lg object-cover border border-slate-100" />
-                    </td>
-                    <td className="py-2.5 font-semibold text-slate-800">{item.itemName}</td>
-                    <td className="py-2.5 text-slate-500">{item.brand}</td>
-                    <td className="py-2.5 text-center">
-                      <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-600 border border-rose-100">
-                        {item.stock}
-                      </span>
-                    </td>
+          {lowStock.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 text-slate-400 font-medium">
+                    <th className="py-2.5 font-medium">#</th>
+                    <th className="py-2.5 font-medium">Image</th>
+                    <th className="py-2.5 font-medium">Item Name</th>
+                    <th className="py-2.5 font-medium">Brand</th>
+                    <th className="py-2.5 font-medium text-center">Stock</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-50 font-medium text-slate-700">
+                  {lowStock.map((item) => (
+                    <tr key={item.rank} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="py-2.5 text-slate-400">{item.rank}</td>
+                      <td className="py-2.5">
+                        {item.image ? (
+                          <img
+                            src={item.image}
+                            alt={item.itemName}
+                            className="w-8 h-8 rounded-lg object-cover border border-slate-100"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 font-bold text-[10px]">
+                            {item.itemName?.slice(0, 2)?.toUpperCase()}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-2.5 font-semibold text-slate-800">{item.itemName}</td>
+                      <td className="py-2.5 text-slate-500">{item.brand}</td>
+                      <td className="py-2.5 text-center">
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-600 border border-rose-100">
+                          {item.stock}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="py-14 text-center">
+              <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
+              <p className="text-xs font-semibold text-slate-700">All stock levels healthy</p>
+              <p className="text-[11px] text-slate-400 mt-1 max-w-xs mx-auto">
+                No products are currently under their low-stock replenishment alert.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Recent Orders */}
@@ -346,52 +396,62 @@ export const DashboardPage = () => {
             </Link>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 text-slate-400 font-medium">
-                  <th className="py-2.5 font-medium">#</th>
-                  <th className="py-2.5 font-medium">Customer</th>
-                  <th className="py-2.5 font-medium text-center">Type</th>
-                  <th className="py-2.5 font-medium text-right">Amount</th>
-                  <th className="py-2.5 font-medium text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50 font-medium text-slate-700">
-                {recentOrders.map((ord) => (
-                  <tr key={ord.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="py-3 font-semibold text-slate-600">{ord.id}</td>
-                    <td className="py-3 font-semibold text-slate-800">{ord.customer}</td>
-                    <td className="py-3 text-center">
-                      <span
-                        className={`inline-block px-2.5 py-0.5 rounded-md text-[11px] font-semibold ${
-                          ord.type === 'Online'
-                            ? 'bg-blue-50 text-blue-600'
-                            : 'bg-pink-50 text-pink-600'
-                        }`}
-                      >
-                        {ord.type}
-                      </span>
-                    </td>
-                    <td className="py-3 text-right font-bold text-slate-900">₹{ord.amount}</td>
-                    <td className="py-3 text-right">
-                      <span
-                        className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                          ord.status === 'Completed' || ord.status === 'Delivered'
-                            ? 'bg-emerald-50 text-emerald-600'
-                            : ord.status === 'Processing'
-                            ? 'bg-blue-50 text-blue-600'
-                            : 'bg-amber-50 text-amber-600'
-                        }`}
-                      >
-                        {ord.status}
-                      </span>
-                    </td>
+          {recentOrders.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 text-slate-400 font-medium">
+                    <th className="py-2.5 font-medium">#</th>
+                    <th className="py-2.5 font-medium">Customer</th>
+                    <th className="py-2.5 font-medium text-center">Type</th>
+                    <th className="py-2.5 font-medium text-right">Amount</th>
+                    <th className="py-2.5 font-medium text-right">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-50 font-medium text-slate-700">
+                  {recentOrders.map((ord) => (
+                    <tr key={ord.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="py-3 font-semibold text-slate-600">{ord.id}</td>
+                      <td className="py-3 font-semibold text-slate-800">{ord.customer}</td>
+                      <td className="py-3 text-center">
+                        <span
+                          className={`inline-block px-2.5 py-0.5 rounded-md text-[11px] font-semibold ${
+                            ord.type === 'Online'
+                              ? 'bg-blue-50 text-blue-600'
+                              : 'bg-indigo-50 text-indigo-600'
+                          }`}
+                        >
+                          {ord.type}
+                        </span>
+                      </td>
+                      <td className="py-3 text-right font-bold text-slate-900">₹{ord.amount}</td>
+                      <td className="py-3 text-right">
+                        <span
+                          className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                            ord.status === 'Completed' || ord.status === 'Delivered'
+                              ? 'bg-emerald-50 text-emerald-600'
+                              : ord.status === 'Processing' || ord.status === 'Shipped'
+                              ? 'bg-blue-50 text-blue-600'
+                              : 'bg-amber-50 text-amber-600'
+                          }`}
+                        >
+                          {ord.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="py-14 text-center">
+              <Clock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p className="text-xs font-semibold text-slate-600">No transactions recorded</p>
+              <p className="text-[11px] text-slate-400 mt-1 max-w-xs mx-auto">
+                In-store POS bills and online customer orders will show up here.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
