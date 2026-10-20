@@ -133,6 +133,7 @@ export const HistoryPage = () => {
     const priorityKeys = [
       { key: 'channel', label: 'Channel' },
       { key: 'paymentType', label: 'Payment Type' },
+      { key: 'customerType', label: 'Customer Type' },
       { key: 'customerName', label: 'Customer Name' },
       { key: 'customerPhone', label: 'Customer Phone' },
       { key: 'customerEmail', label: 'Customer Email' },
@@ -657,6 +658,20 @@ export const HistoryPage = () => {
                               <div className="grid grid-cols-3 gap-2">
                                 <span className="text-slate-500 font-medium">Customer:</span>
                                 <span className="col-span-2 font-bold text-slate-800">{p.customerName}</span>
+                              </div>
+                              <div className="grid grid-cols-3 gap-2">
+                                <span className="text-slate-500 font-medium">Customer Type:</span>
+                                <span className="col-span-2">
+                                  <span
+                                    className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold ${
+                                      p.customerType === 'Online' || isOnline
+                                        ? 'bg-indigo-50 text-indigo-700'
+                                        : 'bg-emerald-50 text-emerald-700'
+                                    }`}
+                                  >
+                                    {p.customerType || (isOnline ? 'Online' : 'Offline')}
+                                  </span>
+                                </span>
                               </div>
                               <div className="grid grid-cols-3 gap-2">
                                 <span className="text-slate-500 font-medium">Phone:</span>

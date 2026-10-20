@@ -332,7 +332,8 @@ class ApiService {
   }
 
   async trackPublicOrder(orderNumber) {
-    return this.request(`/orders/public/track/${orderNumber}`);
+    const encoded = encodeURIComponent(orderNumber || '');
+    return this.request(`/orders/public/track/${encoded}`);
   }
 
   // Reports
@@ -342,6 +343,115 @@ class ApiService {
 
   async getFinancialReport(range) {
     return this.request(`/reports/financial${range ? `?range=${range}` : ''}`);
+  }
+
+  async getSalesReport(params = {}) {
+    const query = new URLSearchParams();
+    Object.keys(params).forEach((key) => {
+      if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
+        query.append(key, params[key]);
+      }
+    });
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    return this.request(`/reports/sales-report${queryString}`);
+  }
+
+  // Customers & Customer Ledger
+  async getCustomers(params = {}) {
+    const query = new URLSearchParams();
+    Object.keys(params).forEach((key) => {
+      if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
+        query.append(key, params[key]);
+      }
+    });
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    return this.request(`/customers${queryString}`);
+  }
+
+  async searchCustomers(q) {
+    return this.request(`/customers/search?q=${encodeURIComponent(q || '')}`);
+  }
+
+  async getCustomer(id) {
+    return this.request(`/customers/${id}`);
+  }
+
+  async createCustomer(customerData) {
+    return this.request('/customers', {
+      method: 'POST',
+      body: JSON.stringify(customerData),
+    });
+  }
+
+  async updateCustomer(id, customerData) {
+    return this.request(`/customers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(customerData),
+    });
+  }
+
+  async archiveCustomer(id) {
+    return this.request(`/customers/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async restoreCustomer(id) {
+    return this.request(`/customers/${id}/restore`, {
+      method: 'PATCH',
+    });
+  }
+
+  async getCustomerOrders(id, params = {}) {
+    const query = new URLSearchParams();
+    Object.keys(params).forEach((key) => {
+      if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
+        query.append(key, params[key]);
+      }
+    });
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    return this.request(`/customers/${id}/orders${queryString}`);
+  }
+
+  async getCustomerDues(id) {
+    return this.request(`/customers/${id}/dues`);
+  }
+
+  async recordCustomerPayment(id, paymentData) {
+    return this.request(`/customers/${id}/payments`, {
+      method: 'POST',
+      body: JSON.stringify(paymentData),
+    });
+  }
+
+  async getCustomerPayments(id) {
+    return this.request(`/customers/${id}/payments`);
+  }
+
+  async getCustomerLedger(id, params = {}) {
+    const query = new URLSearchParams();
+    Object.keys(params).forEach((key) => {
+      if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
+        query.append(key, params[key]);
+      }
+    });
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    return this.request(`/customers/${id}/ledger${queryString}`);
+  }
+
+  async getCustomerStatement(id, params = {}) {
+    const query = new URLSearchParams();
+    Object.keys(params).forEach((key) => {
+      if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
+        query.append(key, params[key]);
+      }
+    });
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    return this.request(`/customers/${id}/statement${queryString}`);
+  }
+
+  async getCustomerTimeline(id) {
+    return this.request(`/customers/${id}/timeline`);
   }
 
   // History & Audit Logs

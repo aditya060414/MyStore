@@ -1,4 +1,5 @@
 import Order from '../models/Order.js';
+import Customer from '../models/Customer.js';
 import Product from '../models/Product.js';
 import Business from '../models/Business.js';
 import Store from '../models/Store.js';
@@ -319,11 +320,43 @@ export const createPublicOrder = async (req, res) => {
     const deliveryCharges = subtotal > 500 ? 0 : 30;
     const totalAmount = subtotal + deliveryCharges;
 
+    // Check if customer exists in business: if found, log to customer account, else do not log
+    let matchedCustomerId = null;
+    if (customer?.phone) {
+      try {
+        const rawDigits = String(customer.phone).replace(/[^\d]/g, '');
+        const phoneRegex = rawDigits.length >= 10 ? new RegExp(rawDigits.slice(-10) + '$') : null;
+        const queryOr = [{ phone: customer.phone }];
+        if (phoneRegex) queryOr.push({ phone: phoneRegex });
+
+        const cust = await Customer.findOne({
+          businessId: business._id,
+          $or: queryOr,
+        });
+
+        if (cust) {
+          matchedCustomerId = cust._id;
+          cust.totalSpend = (cust.totalSpend || 0) + totalAmount;
+          cust.orderCount = (cust.orderCount || 0) + 1;
+          cust.totalOrders = (cust.totalOrders || 0) + 1;
+          cust.lastPurchaseDate = new Date();
+          if (customer.email && !cust.email) cust.email = customer.email;
+          if (customer.deliveryAddress && !cust.address) cust.address = customer.deliveryAddress;
+          if (customer.deliveryAddress && !cust.deliveryAddress) cust.deliveryAddress = customer.deliveryAddress;
+          await cust.save();
+        }
+        // If not found, do not create a new customer record ("else dont log")
+      } catch (custErr) {
+        console.warn('[Public Order Customer Match Warning]:', custErr.message);
+      }
+    }
+
     const order = await Order.create({
       businessId: business._id,
       storeId: store._id,
       orderNumber,
       sequenceNumber,
+      customerId: matchedCustomerId,
       customer,
       items: processedItems,
       subtotal,
@@ -349,6 +382,8 @@ export const createPublicOrder = async (req, res) => {
         paymentMethod,
         paymentType: 'Online',
         channel: 'Online Storefront',
+        customerType: 'Online',
+        orderType: 'Online',
         customerName: customer.name,
         customerPhone: customer.phone,
         customerEmail: customer.email || '',
@@ -372,20 +407,184 @@ export const createPublicOrder = async (req, res) => {
   }
 };
 
-// @desc    Public: Track order by order number
+// @desc    Public: Track order by order number with live current status & timeline
 // @route   GET /api/v1/orders/public/track/:orderNumber
 export const trackPublicOrder = async (req, res) => {
   try {
-    const { orderNumber } = req.params;
-    const formattedNumber = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
-    const order = await Order.findOne({ orderNumber: formattedNumber }).populate('storeId', 'name address phone');
-
-    if (!order) {
-      return res.status(404).json({ success: false, message: 'Order not found' });
+    const rawNumber = req.params.orderNumber;
+    if (!rawNumber) {
+      return res.status(400).json({ success: false, message: 'Order number is required' });
     }
 
-    res.json({ success: true, data: order });
+    const cleaned = decodeURIComponent(rawNumber).trim();
+    const cleanNum = cleaned.replace(/^#/, '');
+    const numOnly = cleanNum.replace(/^ORD/i, '');
+
+    const candidates = [
+      cleaned,
+      `#${cleanNum}`,
+      cleanNum,
+      `#ORD${numOnly}`,
+      `ORD${numOnly}`,
+      numOnly,
+    ];
+
+    const order = await Order.findOne({
+      $or: [
+        { orderNumber: { $in: candidates } },
+        { orderNumber: new RegExp(`^#?${cleanNum}$`, 'i') },
+        { orderNumber: new RegExp(`^#?ORD${numOnly}$`, 'i') },
+        { sequenceNumber: Number(numOnly) || -1 },
+      ],
+    })
+      .populate('storeId', 'name address phone email handle slug')
+      .populate('businessId', 'name contactPhone contactEmail address currencySymbol');
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: `Order '${cleaned}' not found` });
+    }
+
+    // Fetch audit trail for timestamps of status changes
+    const auditLogs = await AuditLog.find({
+      entityId: order._id.toString(),
+      action: { $in: ['ORDER_CREATED', 'ORDER_STATUS_UPDATED'] },
+    }).sort({ createdAt: 1 });
+
+    const statusTimestamps = {};
+    for (const log of auditLogs) {
+      if (log.action === 'ORDER_CREATED') {
+        statusTimestamps['Pending'] = log.createdAt;
+      } else if (log.action === 'ORDER_STATUS_UPDATED' && log.details?.newStatus) {
+        statusTimestamps[log.details.newStatus] = log.createdAt;
+      }
+    }
+
+    const currentStatus = order.orderStatus || 'Pending';
+    const isCancelled = currentStatus === 'Cancelled';
+
+    const statusSequence = ['Pending', 'Processing', 'Shipped', 'Delivered'];
+    const currentIdx = statusSequence.indexOf(currentStatus);
+
+    const stepDefinitions = [
+      {
+        status: 'Pending',
+        title: 'Order Placed',
+        description: 'Order received and confirmed by the store',
+        icon: 'Receipt',
+      },
+      {
+        status: 'Processing',
+        title: 'In Preparation',
+        description: 'Items are being packed & quality checked',
+        icon: 'Package',
+      },
+      {
+        status: 'Shipped',
+        title: 'Out for Delivery',
+        description: 'Delivery partner has picked up your package',
+        icon: 'Truck',
+      },
+      {
+        status: 'Delivered',
+        title: 'Delivered',
+        description: 'Order successfully delivered to customer',
+        icon: 'CheckCircle2',
+      },
+    ];
+
+    const timeline = isCancelled
+      ? [
+          {
+            status: 'Pending',
+            title: 'Order Placed',
+            description: 'Order placed by customer',
+            isCompleted: true,
+            isCurrent: false,
+            timestamp: statusTimestamps['Pending'] || order.createdAt,
+          },
+          {
+            status: 'Cancelled',
+            title: 'Order Cancelled',
+            description: 'This order was cancelled and will not be fulfilled',
+            isCompleted: true,
+            isCurrent: true,
+            timestamp: statusTimestamps['Cancelled'] || order.updatedAt,
+          },
+        ]
+      : stepDefinitions.map((step, idx) => {
+          const isCompleted = currentIdx >= idx;
+          const isCurrent = currentIdx === idx;
+          let timestamp = statusTimestamps[step.status];
+          if (!timestamp && isCompleted) {
+            timestamp = idx === 0 ? order.createdAt : order.updatedAt;
+          }
+          return {
+            ...step,
+            isCompleted,
+            isCurrent,
+            timestamp: timestamp || null,
+          };
+        });
+
+    const statusMeta = {
+      Pending: {
+        label: 'Order Placed',
+        headline: 'Order Placed & Confirmed!',
+        subheadline: 'The store has received your order and is reviewing your items.',
+        badgeColor: 'amber',
+        progressPercent: 25,
+      },
+      Processing: {
+        label: 'In Preparation',
+        headline: 'Your order is being prepared!',
+        subheadline: 'The store team is currently picking and packing your items.',
+        badgeColor: 'blue',
+        progressPercent: 50,
+      },
+      Shipped: {
+        label: 'Out for Delivery',
+        headline: 'Out for Delivery!',
+        subheadline: 'Your order is on the way to your delivery address.',
+        badgeColor: 'indigo',
+        progressPercent: 75,
+      },
+      Delivered: {
+        label: 'Delivered',
+        headline: 'Order Delivered!',
+        subheadline: 'Package has been delivered successfully. Thank you for shopping!',
+        badgeColor: 'emerald',
+        progressPercent: 100,
+      },
+      Cancelled: {
+        label: 'Cancelled',
+        headline: 'Order Cancelled',
+        subheadline: 'This order was cancelled by the store or customer.',
+        badgeColor: 'rose',
+        progressPercent: 0,
+      },
+    };
+
+    const currentMeta = statusMeta[currentStatus] || statusMeta['Pending'];
+
+    res.json({
+      success: true,
+      data: {
+        ...order.toObject(),
+        tracking: {
+          currentStatus,
+          statusLabel: currentMeta.label,
+          headline: currentMeta.headline,
+          subheadline: currentMeta.subheadline,
+          badgeColor: currentMeta.badgeColor,
+          progressPercent: currentMeta.progressPercent,
+          isCancelled,
+          timeline,
+          lastUpdated: order.updatedAt,
+        },
+      },
+    });
   } catch (error) {
+    console.error('[Track Public Order Error]:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

@@ -1,6 +1,7 @@
 import Sale from '../models/Sale.js';
 import Product from '../models/Product.js';
 import Customer from '../models/Customer.js';
+import CustomerLedger from '../models/CustomerLedger.js';
 import InventoryMovement from '../models/InventoryMovement.js';
 import AuditLog from '../models/AuditLog.js';
 import Business from '../models/Business.js';
@@ -14,11 +15,13 @@ export const createSale = async (req, res) => {
       customerId,
       customerName = 'Walk-in Customer',
       customerPhone = '',
-      customerType = 'Walk-in Customer',
+      customerType = 'Offline',
       items = [],
       discountType = 'percentage',
       discountValue = 0,
       paymentMethod = 'Cash',
+      paidAmount: rawPaidAmount,
+      dueDate: rawDueDate,
       notes = '',
       billFormat = 'A4 - Standard',
     } = req.body;
@@ -85,6 +88,14 @@ export const createSale = async (req, res) => {
     const totalAmount = discountedSubtotal + taxAmount;
     const grossProfit = totalAmount - taxAmount - totalCogs;
 
+    // Determine payment and balance due
+    const isCredit = paymentMethod === 'Credit';
+    const initialPaid = isCredit
+      ? Math.max(0, Number(rawPaidAmount !== undefined ? rawPaidAmount : 0))
+      : totalAmount;
+    const balanceDue = Math.max(0, totalAmount - initialPaid);
+    const paymentStatus = balanceDue <= 0 ? 'paid' : initialPaid > 0 ? 'partial' : 'pending';
+
     // Determine sequential bill number for this business
     const lastSale = await Sale.findOne({ businessId: activeBusinessId }).sort({ sequenceNumber: -1 });
     const sequenceNumber = lastSale && lastSale.sequenceNumber ? lastSale.sequenceNumber + 1 : 1001;
@@ -95,23 +106,54 @@ export const createSale = async (req, res) => {
 
     // Handle or create customer record
     let linkedCustomerId = customerId;
-    if (!linkedCustomerId && customerPhone) {
-      let cust = await Customer.findOne({ businessId: activeBusinessId, phone: customerPhone });
-      if (!cust) {
-        cust = await Customer.create({
+    let customerDoc = null;
+
+    if (linkedCustomerId) {
+      customerDoc = await Customer.findOne({ _id: linkedCustomerId, businessId: activeBusinessId });
+    }
+
+    if (!customerDoc && customerPhone) {
+      const cleanPhone = String(customerPhone).replace(/[^\d+]/g, '').trim();
+      customerDoc = await Customer.findOne({ businessId: activeBusinessId, phone: cleanPhone });
+      if (!customerDoc) {
+        customerDoc = await Customer.create({
           businessId: activeBusinessId,
           name: customerName,
-          phone: customerPhone,
-          customerType,
+          phone: cleanPhone,
+          customerType: 'Offline',
           totalSpend: totalAmount,
+          totalPaid: initialPaid,
+          outstandingDue: balanceDue,
           orderCount: 1,
+          lastPurchaseDate: new Date(),
         });
-      } else {
-        cust.totalSpend += totalAmount;
-        cust.orderCount += 1;
-        await cust.save();
       }
-      linkedCustomerId = cust._id;
+      linkedCustomerId = customerDoc._id;
+    }
+
+    // Calculate due date based on payment terms if credit
+    let dueDate = rawDueDate ? new Date(rawDueDate) : null;
+    if (!dueDate && isCredit && customerDoc) {
+      const terms = customerDoc.paymentTerms || 'Due on Receipt';
+      const d = new Date();
+      if (terms === '7 Days') d.setDate(d.getDate() + 7);
+      else if (terms === '15 Days') d.setDate(d.getDate() + 15);
+      else if (terms === '30 Days') d.setDate(d.getDate() + 30);
+      dueDate = d;
+    }
+
+    // Update customer financial stats & channel activity if customer exists
+    if (customerDoc) {
+      customerDoc.totalSpend = (customerDoc.totalSpend || 0) + totalAmount;
+      customerDoc.totalPaid = (customerDoc.totalPaid || 0) + initialPaid;
+      customerDoc.outstandingDue = (customerDoc.outstandingDue || 0) + balanceDue;
+      customerDoc.orderCount = (customerDoc.orderCount || 0) + 1;
+      customerDoc.lastPurchaseDate = new Date();
+
+      if (customerDoc.customerType === 'Online') {
+        customerDoc.customerType = 'Both';
+      }
+      await customerDoc.save();
     }
 
     // Create Sale record
@@ -121,9 +163,11 @@ export const createSale = async (req, res) => {
       billNumber,
       sequenceNumber,
       customerId: linkedCustomerId,
-      customerName,
-      customerPhone,
-      customerType,
+      customerName: customerDoc ? customerDoc.name : customerName,
+      customerPhone: customerDoc ? customerDoc.phone : customerPhone,
+      customerType: 'Offline',
+      channel: 'Offline',
+      orderType: 'Offline',
       cashierId: req.user?._id,
       cashierName: req.user?.name || 'Admin',
       items: processedItems,
@@ -135,13 +179,57 @@ export const createSale = async (req, res) => {
       taxAmount,
       totalAmount,
       paymentMethod,
-      paymentStatus: 'paid',
+      paymentStatus,
+      paidAmount: initialPaid,
+      balanceDue,
+      dueDate,
       cogs: totalCogs,
       grossProfit,
       notes,
       billFormat,
       barcode,
     });
+
+    // Record Customer Ledger entry if customer is tracked
+    if (customerDoc) {
+      if (isCredit) {
+        await CustomerLedger.create({
+          businessId: activeBusinessId,
+          customerId: customerDoc._id,
+          date: new Date(),
+          reference: billNumber,
+          transactionType: 'Credit Sale',
+          debit: totalAmount,
+          credit: initialPaid,
+          runningBalance: customerDoc.outstandingDue,
+          sourceType: 'Sale',
+          sourceId: sale._id,
+          notes: initialPaid > 0 ? `Credit sale (Partially paid ₹${initialPaid})` : 'Credit sale (Full due)',
+          recordedBy: {
+            id: req.user?._id,
+            name: req.user?.name || 'Cashier',
+          },
+        });
+      } else {
+        await CustomerLedger.create({
+          businessId: activeBusinessId,
+          customerId: customerDoc._id,
+          date: new Date(),
+          reference: billNumber,
+          transactionType: 'Sale',
+          debit: totalAmount,
+          credit: totalAmount,
+          runningBalance: customerDoc.outstandingDue,
+          sourceType: 'Sale',
+          sourceId: sale._id,
+          notes: `POS Bill completed via ${paymentMethod}`,
+          recordedBy: {
+            id: req.user?._id,
+            name: req.user?.name || 'Cashier',
+          },
+        });
+      }
+    }
 
     // Atomically deduct product stock & record inventory movements
     for (const item of processedItems) {
@@ -178,6 +266,8 @@ export const createSale = async (req, res) => {
         paymentMethod: sale.paymentMethod || 'Cash',
         paymentType: 'Offline',
         channel: 'Offline POS',
+        customerType: 'Offline',
+        orderType: 'Offline',
         customerName: sale.customerName || 'Walk-in Customer',
         customerPhone: sale.customerPhone || '—',
         itemsCount: processedItems.reduce((sum, i) => sum + (i.quantity || 1), 0),

@@ -23,6 +23,7 @@ import {
   Phone,
   Mail,
   User,
+  ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -466,15 +467,25 @@ export const OrdersPage = () => {
               </button>
               <button
                 onClick={() => {
-                  const storeHandle = selectedOrder.storeId?.handle || selectedOrder.storeId?.slug || 'my-store';
-                  navigator.clipboard.writeText(`${window.location.origin}/store/${storeHandle}/track/${selectedOrder.orderNumber}`);
+                  const storeHandle = selectedOrder.storeId?.handle || selectedOrder.storeId?.slug || 'store';
+                  const cleanOrderNo = encodeURIComponent(selectedOrder.orderNumber);
+                  navigator.clipboard.writeText(`${window.location.origin}/store/${storeHandle}/track/${cleanOrderNo}`);
                   toast.success('Order tracking link copied to clipboard!');
                 }}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md shadow-blue-500/20 transition-colors"
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md shadow-blue-500/20 transition-colors cursor-pointer"
               >
                 <Share2 className="w-3.5 h-3.5" />
                 <span>Share Order</span>
               </button>
+              <a
+                href={`/store/${selectedOrder.storeId?.handle || selectedOrder.storeId?.slug || 'store'}/track/${encodeURIComponent(selectedOrder.orderNumber)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="p-2.5 rounded-xl border border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                title="Preview Customer Order Tracking"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
             </div>
           </div>
         )}

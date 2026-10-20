@@ -8,6 +8,11 @@ const customerSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    storeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Store',
+      index: true,
+    },
     name: {
       type: String,
       required: [true, 'Customer name is required'],
@@ -15,6 +20,7 @@ const customerSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
+      required: [true, 'Phone number is required'],
       trim: true,
       index: true,
     },
@@ -22,11 +28,44 @@ const customerSchema = new mongoose.Schema(
       type: String,
       lowercase: true,
       trim: true,
+      default: '',
     },
     customerType: {
       type: String,
-      enum: ['Walk-in Customer', 'Regular', 'Wholesale', 'VIP'],
-      default: 'Walk-in Customer',
+      enum: ['Offline', 'Online', 'Both'],
+      default: 'Offline',
+    },
+    status: {
+      type: String,
+      enum: ['Active', 'Archived'],
+      default: 'Active',
+      index: true,
+    },
+    billingAddress: {
+      type: String,
+      default: '',
+    },
+    deliveryAddress: {
+      type: String,
+      default: '',
+    },
+    address: {
+      type: String,
+      default: '',
+    },
+    notes: {
+      type: String,
+      default: '',
+    },
+    creditLimit: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    paymentTerms: {
+      type: String,
+      enum: ['Due on Receipt', '7 Days', '15 Days', '30 Days'],
+      default: 'Due on Receipt',
     },
     loyaltyPoints: {
       type: Number,
@@ -36,18 +75,27 @@ const customerSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    totalPaid: {
+      type: Number,
+      default: 0,
+    },
+    outstandingDue: {
+      type: Number,
+      default: 0,
+    },
     orderCount: {
       type: Number,
       default: 0,
     },
-    address: {
-      type: String,
-      default: '',
+    lastPurchaseDate: {
+      type: Date,
     },
   },
   { timestamps: true }
 );
 
 customerSchema.index({ businessId: 1, phone: 1 });
+customerSchema.index({ businessId: 1, status: 1 });
+customerSchema.index({ businessId: 1, outstandingDue: -1 });
 
 export default mongoose.model('Customer', customerSchema);

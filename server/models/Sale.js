@@ -78,7 +78,15 @@ const saleSchema = new mongoose.Schema(
     },
     customerType: {
       type: String,
-      default: 'Walk-in Customer',
+      default: 'Offline',
+    },
+    channel: {
+      type: String,
+      default: 'Offline',
+    },
+    orderType: {
+      type: String,
+      default: 'Offline',
     },
     cashierId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -122,13 +130,24 @@ const saleSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ['Cash', 'Card', 'UPI', 'Other'],
+      enum: ['Cash', 'Card', 'UPI', 'Credit', 'Other'],
       default: 'Cash',
     },
     paymentStatus: {
       type: String,
-      enum: ['paid', 'pending', 'refunded'],
+      enum: ['paid', 'pending', 'partial', 'overdue', 'refunded'],
       default: 'paid',
+    },
+    paidAmount: {
+      type: Number,
+      default: 0,
+    },
+    balanceDue: {
+      type: Number,
+      default: 0,
+    },
+    dueDate: {
+      type: Date,
     },
     cogs: {
       type: Number,

@@ -31,7 +31,7 @@ A commercial, production-ready, multi-business retail SaaS platform engineered f
 │   │   ├── components/layout/  # Sidebar, Navbar, AppLayout
 │   │   ├── context/            # AuthContext (multi-business session & switching)
 │   │   ├── pages/
-│   │   │   ├── merchant/       # Dashboard, Inventory, Bill Format, Orders, Reports, History, Share Store, Settings
+│   │   │   ├── merchant/       # Dashboard, Inventory, POS / Billing, Orders, Customers, Reports, History, Share Store, Settings
 │   │   │   ├── public/         # Online Storefront & Order Tracking
 │   │   │   ├── platform/       # SaaS Operator Platform Admin Console
 │   │   │   ├── marketing/      # Public Landing Page & Features

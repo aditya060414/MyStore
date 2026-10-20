@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -19,31 +20,102 @@ import {
   UserPlus,
   CheckCircle2,
   ChevronDown,
+  Clock,
+  User,
+  AlertTriangle,
+  X,
+  Users,
 } from 'lucide-react';
 
 export const BillFormatPage = () => {
   const { activeBusiness, activeTenant } = useAuth();
   const currentBusiness = activeBusiness || activeTenant;
+  const [searchParams] = useSearchParams();
+
   const [allProducts, setAllProducts] = useState([]);
   const [productSearch, setProductSearch] = useState('');
   const [searchResults, setSearchResults] = useState([]);
 
-  // Customer info
+  // Customer info & selection
+  const [selectedCustomerId, setSelectedCustomerId] = useState(null);
+  const [selectedCustomerDoc, setSelectedCustomerDoc] = useState(null);
+  const [customerSearchInput, setCustomerSearchInput] = useState('');
+  const [customerSearchResults, setCustomerSearchResults] = useState([]);
+  const [isCustomerSearching, setIsCustomerSearching] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [customerType, setCustomerType] = useState('Walk-in Customer');
+
+  // Quick Customer Creation Modal
+  const [isQuickCustomerOpen, setIsQuickCustomerOpen] = useState(false);
+  const [quickCustomerForm, setQuickCustomerForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    creditLimit: '',
+    paymentTerms: 'Due on Receipt',
+    billingAddress: '',
+  });
+  const [quickCustomerSubmitting, setQuickCustomerSubmitting] = useState(false);
 
   // Items in bill - starts fresh and empty
   const [items, setItems] = useState([]);
 
   // Payment & discount
   const [paymentMode, setPaymentMode] = useState('Cash');
+  const [paidNowAmount, setPaidNowAmount] = useState('');
   const [discountType, setDiscountType] = useState('Percentage');
   const [discountValue, setDiscountValue] = useState(0);
   const [notes, setNotes] = useState('');
   const [billFormat, setBillFormat] = useState('A4 - Standard');
   const [billNumber, setBillNumber] = useState('New Bill');
   const [saving, setSaving] = useState(false);
+
+  // Check URL params if customer pre-selected from customer profile
+  useEffect(() => {
+    const custIdParam = searchParams.get('customerId');
+    const custNameParam = searchParams.get('customerName');
+    const custPhoneParam = searchParams.get('customerPhone');
+
+    if (custIdParam) {
+      setSelectedCustomerId(custIdParam);
+      if (custNameParam) setCustomerName(decodeURIComponent(custNameParam));
+      if (custPhoneParam) setCustomerPhone(decodeURIComponent(custPhoneParam));
+
+      const loadCust = async () => {
+        try {
+          const res = await api.getCustomer(custIdParam);
+          if (res.success && res.data?.customer) {
+            setSelectedCustomerDoc(res.data.customer);
+            setCustomerName(res.data.customer.name);
+            setCustomerPhone(res.data.customer.phone);
+          }
+        } catch (_) {}
+      };
+      loadCust();
+    }
+  }, [searchParams]);
+
+  // Live customer search autocomplete
+  useEffect(() => {
+    if (!customerSearchInput.trim()) {
+      setCustomerSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsCustomerSearching(true);
+      try {
+        const res = await api.searchCustomers(customerSearchInput);
+        if (res.success) {
+          setCustomerSearchResults(res.data || []);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsCustomerSearching(false);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [customerSearchInput]);
 
   // Load products for live search
   useEffect(() => {
@@ -120,10 +192,68 @@ export const BillFormatPage = () => {
 
   const handleClearAll = () => {
     setItems([]);
+    setSelectedCustomerId(null);
+    setSelectedCustomerDoc(null);
     setCustomerName('');
     setCustomerPhone('');
+    setPaidNowAmount('');
+    setCustomerSearchInput('');
     setNotes('');
     setDiscountValue(0);
+  };
+
+  const handleSelectCustomer = (cust) => {
+    setSelectedCustomerId(cust._id);
+    setSelectedCustomerDoc(cust);
+    setCustomerName(cust.name);
+    setCustomerPhone(cust.phone);
+    setCustomerSearchInput('');
+    setCustomerSearchResults([]);
+  };
+
+  const handleClearCustomer = () => {
+    setSelectedCustomerId(null);
+    setSelectedCustomerDoc(null);
+    setCustomerName('');
+    setCustomerPhone('');
+    setPaidNowAmount('');
+  };
+
+  const handleQuickCustomerSubmit = async (e) => {
+    e.preventDefault();
+    if (!quickCustomerForm.name.trim() || !quickCustomerForm.phone.trim()) {
+      toast.warning('Name and phone number are required');
+      return;
+    }
+    setQuickCustomerSubmitting(true);
+    try {
+      const res = await api.createCustomer({
+        name: quickCustomerForm.name,
+        phone: quickCustomerForm.phone,
+        email: quickCustomerForm.email,
+        creditLimit: Number(quickCustomerForm.creditLimit || 0),
+        paymentTerms: quickCustomerForm.paymentTerms || 'Due on Receipt',
+        billingAddress: quickCustomerForm.billingAddress,
+        customerType: 'Offline',
+      });
+      if (res.success && res.data) {
+        toast.success(`Customer "${res.data.name}" created!`);
+        handleSelectCustomer(res.data);
+        setIsQuickCustomerOpen(false);
+        setQuickCustomerForm({
+          name: '',
+          phone: '',
+          email: '',
+          creditLimit: '',
+          paymentTerms: 'Due on Receipt',
+          billingAddress: '',
+        });
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to create customer');
+    } finally {
+      setQuickCustomerSubmitting(false);
+    }
   };
 
   // Calculations
@@ -150,16 +280,26 @@ export const BillFormatPage = () => {
       toast.warning('Please add at least one item to save the bill.');
       return;
     }
+
+    if (paymentMode === 'Credit' && (!customerName || customerName === 'Walk-in Customer')) {
+      toast.warning('Please select or register a customer for credit / pay later bills.');
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
+        customerId: selectedCustomerId,
         customerName: customerName || 'Walk-in Customer',
         customerPhone,
-        customerType,
+        customerType: 'Offline',
+        channel: 'Offline',
+        orderType: 'Offline',
         items,
         discountType: discountType.toLowerCase(),
         discountValue,
         paymentMethod: paymentMode,
+        paidAmount: paymentMode === 'Credit' ? Number(paidNowAmount || 0) : totalAmount,
         notes,
         billFormat,
       };
@@ -168,7 +308,17 @@ export const BillFormatPage = () => {
       if (res.success) {
         const savedBillNo = res.data?.billNumber || 'Bill';
         if (res.data?.billNumber) setBillNumber(res.data.billNumber);
-        toast.success(`Bill ${savedBillNo} saved and inventory updated!`);
+        toast.success(`Bill ${savedBillNo} saved and recorded successfully!`);
+
+        // If customer was linked, refresh customer stats
+        if (selectedCustomerId) {
+          try {
+            const custRes = await api.getCustomer(selectedCustomerId);
+            if (custRes.success && custRes.data?.customer) {
+              setSelectedCustomerDoc(custRes.data.customer);
+            }
+          } catch (_) {}
+        }
       }
     } catch (err) {
       toast.error(`Error saving bill: ${err.message}`);
@@ -186,7 +336,7 @@ export const BillFormatPage = () => {
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Generate Bill</h1>
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">POS / Billing</h1>
         <p className="text-sm text-slate-500 mt-0.5">
           Create a new bill for your customer. Select items, quantity and payment details.
         </p>
@@ -196,65 +346,123 @@ export const BillFormatPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column (Inputs, Items, Payment) */}
         <div className="lg:col-span-7 space-y-5">
-          {/* 1. Customer Details (Optional) */}
+          {/* 1. Customer Details (Optional / Credit Account) */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm space-y-4">
-            <h2 className="text-sm font-bold text-slate-900">Customer Details (Optional)</h2>
-
-            {/* Customer Search & Quick Add */}
-            <div className="flex items-center gap-3">
-              <div className="flex-1 relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Search customer by name or phone...."
-                  className="w-full bg-[#f8fafc] text-xs text-slate-700 pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-500 focus:bg-white transition-all placeholder:text-slate-400"
-                />
-              </div>
-              <button
-                type="button"
-                className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-xl border border-blue-500 text-blue-600 hover:bg-blue-50 transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add New Customer</span>
-              </button>
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-slate-900">Customer Details (Optional)</h2>
+              {selectedCustomerDoc && (
+                <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                  Customer Linked
+                </span>
+              )}
             </div>
 
-            {/* Customer Fields */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-              <div>
-                <label className="block text-slate-600 font-semibold mb-1">Customer Name</label>
-                <input
-                  type="text"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="e.g. Rahul Mehta"
-                  className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-medium focus:outline-none focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-600 font-semibold mb-1">Phone Number</label>
-                <input
-                  type="text"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  placeholder="9876543210"
-                  className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-medium focus:outline-none focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-600 font-semibold mb-1">Customer Type</label>
-                <select
-                  value={customerType}
-                  onChange={(e) => setCustomerType(e.target.value)}
-                  className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-medium focus:outline-none focus:border-blue-500"
+            {selectedCustomerDoc ? (
+              <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200/80 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs shrink-0 shadow-xs">
+                    {selectedCustomerDoc.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-900 text-xs sm:text-sm">{selectedCustomerDoc.name}</span>
+                      <span className="text-[11px] font-semibold text-slate-500">({selectedCustomerDoc.phone})</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px]">
+                      <span className="font-bold text-rose-600">
+                        Due: ₹{(selectedCustomerDoc.outstandingDue || 0).toLocaleString('en-IN')}
+                      </span>
+                      <span>•</span>
+                      <span className="text-slate-500 font-medium">{selectedCustomerDoc.paymentTerms || 'Due on Receipt'}</span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleClearCustomer}
+                  className="px-2.5 py-1 rounded-lg text-slate-500 hover:text-slate-800 bg-white border border-slate-200 transition-colors text-xs font-semibold cursor-pointer shrink-0"
                 >
-                  <option>Walk-in Customer</option>
-                  <option>Regular</option>
-                  <option>VIP</option>
-                  <option>Wholesale</option>
-                </select>
+                  Change
+                </button>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-3">
+                {/* Customer Search & Quick Add */}
+                <div className="flex items-center gap-2 relative">
+                  <div className="flex-1 relative">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={customerSearchInput}
+                      onChange={(e) => setCustomerSearchInput(e.target.value)}
+                      placeholder="Search customer by name or phone..."
+                      className="w-full bg-[#f8fafc] text-xs text-slate-700 pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-500 focus:bg-white transition-all placeholder:text-slate-400"
+                    />
+                    {isCustomerSearching && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-blue-600 border-t-transparent" />
+                      </div>
+                    )}
+
+                    {/* Customer Autocomplete Dropdown */}
+                    {customerSearchResults.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl border border-slate-200 shadow-lg z-30 divide-y divide-slate-100 max-h-48 overflow-y-auto">
+                        {customerSearchResults.map((cust) => (
+                          <div
+                            key={cust._id}
+                            onClick={() => handleSelectCustomer(cust)}
+                            className="p-2.5 hover:bg-blue-50/60 cursor-pointer flex items-center justify-between transition-colors text-xs"
+                          >
+                            <div>
+                              <div className="font-bold text-slate-900">{cust.name}</div>
+                              <div className="text-[11px] text-slate-400">{cust.phone}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-[11px] font-bold text-rose-600">
+                                Due: ₹{(cust.outstandingDue || 0).toLocaleString('en-IN')}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsQuickCustomerOpen(true)}
+                    className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-xl border border-blue-500 text-blue-600 hover:bg-blue-50 transition-colors shrink-0 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>New Customer</span>
+                  </button>
+                </div>
+
+                {/* Customer Fields */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Customer Name</label>
+                    <input
+                      type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Walk-in Customer"
+                      className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-medium focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-semibold mb-1">Phone Number</label>
+                    <input
+                      type="text"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      placeholder="e.g. 9876543210"
+                      className="w-full bg-[#f8fafc] border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-medium focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 2. Add Items Card */}
@@ -402,28 +610,61 @@ export const BillFormatPage = () => {
 
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1.5">Payment Mode</label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-5 gap-1.5">
                   {[
                     { mode: 'Cash', icon: Banknote },
-                    { mode: 'Card', icon: CreditCard },
                     { mode: 'UPI', icon: QrCode },
+                    { mode: 'Card', icon: CreditCard },
+                    { mode: 'Credit', icon: Clock },
                     { mode: 'Other', icon: MoreHorizontal },
                   ].map(({ mode, icon: Icon }) => (
                     <button
                       key={mode}
                       type="button"
                       onClick={() => setPaymentMode(mode)}
-                      className={`flex flex-col items-center justify-center gap-1 py-2 px-2 rounded-xl text-xs font-semibold border transition-all ${
+                      className={`flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-xl text-xs font-semibold border transition-all ${
                         paymentMode === mode
                           ? 'border-blue-600 bg-blue-50 text-blue-600 shadow-sm'
                           : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                       }`}
                     >
                       <Icon className="w-4 h-4" />
-                      <span>{mode}</span>
+                      <span className="truncate text-[10px] sm:text-[11px]">{mode}</span>
                     </button>
                   ))}
                 </div>
+
+                {/* Due / Credit Sale Details */}
+                {paymentMode === 'Credit' && (
+                  <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-2 mt-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-amber-800">Payment Terms:</span>
+                      <span className="font-bold text-amber-900">
+                        {selectedCustomerDoc?.paymentTerms || 'Due on Receipt'}
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Amount Paid Now (₹) <span className="text-slate-400 font-normal">(0 for full due)</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max={totalAmount}
+                        placeholder="0"
+                        value={paidNowAmount}
+                        onChange={(e) => setPaidNowAmount(e.target.value)}
+                        className="w-full text-xs font-bold text-slate-900 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs pt-1 border-t border-amber-200/60 font-bold text-rose-700">
+                      <span>Remaining Balance Due:</span>
+                      <span>₹{Math.max(0, totalAmount - Number(paidNowAmount || 0)).toLocaleString('en-IN')}</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Discount */}
@@ -537,7 +778,7 @@ export const BillFormatPage = () => {
                 <p className="text-slate-500">{currentDateFormatted}, {currentTimeFormatted}</p>
                 <p className="font-medium">Customer: {customerName || 'Walk-in'}</p>
                 {customerPhone && <p className="text-slate-500">Phone: {customerPhone}</p>}
-                <p className="text-[10px] text-slate-400">Type: {customerType}</p>
+                <p className="text-[10px] text-slate-400">Channel: Offline POS</p>
               </div>
             </div>
 
@@ -614,6 +855,98 @@ export const BillFormatPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Quick Add Customer Modal */}
+      {isQuickCustomerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                <Users className="w-5 h-5 text-blue-600" /> Quick Add Customer
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsQuickCustomerOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleQuickCustomerSubmit} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Customer Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Anand Sharma"
+                  value={quickCustomerForm.name}
+                  onChange={(e) => setQuickCustomerForm({ ...quickCustomerForm, name: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Phone Number <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="e.g. 9876543210"
+                  value={quickCustomerForm.phone}
+                  onChange={(e) => setQuickCustomerForm({ ...quickCustomerForm, phone: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Payment Terms</label>
+                <select
+                  value={quickCustomerForm.paymentTerms}
+                  onChange={(e) => setQuickCustomerForm({ ...quickCustomerForm, paymentTerms: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
+                >
+                  <option value="Due on Receipt">Due on Receipt</option>
+                  <option value="7 Days">7 Days</option>
+                  <option value="15 Days">15 Days</option>
+                  <option value="30 Days">30 Days</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Address (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="Street / City"
+                  value={quickCustomerForm.billingAddress}
+                  onChange={(e) => setQuickCustomerForm({ ...quickCustomerForm, billingAddress: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsQuickCustomerOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={quickCustomerSubmitting}
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm transition-all cursor-pointer"
+                >
+                  {quickCustomerSubmitting ? 'Creating...' : 'Create & Select'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

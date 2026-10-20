@@ -3,8 +3,10 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Package,
-  FileSpreadsheet,
+  Receipt,
   ShoppingBag,
+  Users,
+  TrendingUp,
   BarChart3,
   Clock,
   Share2,
@@ -16,8 +18,10 @@ import {
 const navItems = [
   { name: 'Dashboard', path: '/app/dashboard', icon: LayoutDashboard },
   { name: 'Store Inventory', path: '/app/inventory', icon: Package },
-  { name: 'Bill Format', path: '/app/bill-format', icon: FileSpreadsheet },
+  { name: 'POS/Billing', path: '/app/bill-format', icon: Receipt },
   { name: 'Online Orders', path: '/app/orders', icon: ShoppingBag },
+  { name: 'Customers', path: '/app/customers', icon: Users },
+  { name: 'Sales Report', path: '/app/sales-report', icon: TrendingUp },
   { name: 'Reports', path: '/app/reports', icon: BarChart3 },
   { name: 'History', path: '/app/history', icon: Clock },
   { name: 'Share Store', path: '/app/share', icon: Share2 },

@@ -11,7 +11,10 @@ import { InventoryPage } from './pages/merchant/InventoryPage';
 import { BillFormatPage } from './pages/merchant/BillFormatPage';
 import { OrdersPage } from './pages/merchant/OrdersPage';
 import { ReportsPage } from './pages/merchant/ReportsPage';
+import { SalesReportPage } from './pages/merchant/SalesReportPage';
 import { HistoryPage } from './pages/merchant/HistoryPage';
+import { CustomersPage } from './pages/merchant/CustomersPage';
+import { CustomerDetailPage } from './pages/merchant/CustomerDetailPage';
 import { ShareStorePage } from './pages/merchant/ShareStorePage';
 import { SettingsPage } from './pages/merchant/SettingsPage';
 
@@ -21,6 +24,7 @@ import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { OnboardingPage } from './pages/auth/OnboardingPage';
 import { PublicStorefrontPage } from './pages/public/PublicStorefrontPage';
+import { TrackOrderPage } from './pages/public/TrackOrderPage';
 import { PlatformAdminPage } from './pages/platform/PlatformAdminPage';
 import { AdminRoute } from './components/auth/AdminRoute';
 
@@ -83,8 +87,12 @@ export const App = () => {
           }
         />
 
-        {/* Public Storefront */}
+        {/* Public Storefront & Order Tracking */}
+        <Route path="/store/:storeHandle/track/:orderNumber" element={<TrackOrderPage />} />
+        <Route path="/store/:storeHandle/track" element={<TrackOrderPage />} />
         <Route path="/store/:storeHandle" element={<PublicStorefrontPage />} />
+        <Route path="/track/:orderNumber" element={<TrackOrderPage />} />
+        <Route path="/track" element={<TrackOrderPage />} />
 
         {/* Protected Platform Admin Console */}
         <Route
@@ -117,7 +125,12 @@ export const App = () => {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="inventory" element={<InventoryPage />} />
           <Route path="bill-format" element={<BillFormatPage />} />
+          <Route path="pos" element={<BillFormatPage />} />
+          <Route path="billing" element={<BillFormatPage />} />
           <Route path="orders" element={<OrdersPage />} />
+          <Route path="customers" element={<CustomersPage />} />
+          <Route path="customers/:id" element={<CustomerDetailPage />} />
+          <Route path="sales-report" element={<SalesReportPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="history" element={<HistoryPage />} />
           <Route path="share" element={<ShareStorePage />} />

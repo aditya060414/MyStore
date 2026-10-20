@@ -94,7 +94,7 @@ export const getHistory = async (req, res) => {
       customerPhone: s.customerPhone || '—',
       customerEmail: '',
       customerAddress: '',
-      customerType: s.customerType || 'Walk-in Customer',
+      customerType: s.customerType || 'Offline',
       paymentMethod: s.paymentMethod || 'Cash',
       paymentStatus: s.paymentStatus || 'paid',
       items: (s.items || []).map((it) => ({
@@ -126,7 +126,7 @@ export const getHistory = async (req, res) => {
       customerPhone: o.customer?.phone || '—',
       customerEmail: o.customer?.email || '',
       customerAddress: o.customer?.deliveryAddress || '',
-      customerType: 'Online Customer',
+      customerType: o.customerType || 'Online',
       paymentMethod: o.paymentMethod || 'UPI',
       paymentStatus: o.paymentStatus || 'paid',
       orderStatus: o.orderStatus || 'Delivered',

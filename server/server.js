@@ -17,6 +17,7 @@ import reportRoutes from './routes/reportRoutes.js';
 import historyRoutes from './routes/historyRoutes.js';
 import subscriptionRoutes from './routes/subscriptionRoutes.js';
 import platformRoutes from './routes/platformRoutes.js';
+import customerRoutes from './routes/customerRoutes.js';
 
 dotenv.config();
 
@@ -62,6 +63,7 @@ app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/history', historyRoutes);
 app.use('/api/v1/subscriptions', subscriptionRoutes);
 app.use('/api/v1/platform', platformRoutes);
+app.use('/api/v1/customers', customerRoutes);
 
 // Error handling
 app.use(notFound);

@@ -51,11 +51,29 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    customerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Customer',
+      default: null,
+      index: true,
+    },
     customer: {
       name: { type: String, required: true },
       phone: { type: String, required: true },
       email: { type: String, default: '' },
       deliveryAddress: { type: String, default: '' },
+    },
+    customerType: {
+      type: String,
+      default: 'Online',
+    },
+    channel: {
+      type: String,
+      default: 'Online',
+    },
+    orderType: {
+      type: String,
+      default: 'Online',
     },
     items: [orderItemSchema],
     subtotal: {
